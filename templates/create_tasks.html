@@ -1,60 +1,37 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h2 class="mb-4">Assign New Task</h2>
-
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label for="title" class="form-label">Task Title *</label>
-                        <input type="text" class="form-control" id="title" name="title" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="assigned_to" class="form-label">Assign To *</label>
-                            <select class="form-control" id="assigned_to" name="assigned_to" required>
-                                <option value="">Select user...</option>
-                                {% for user in users %}
-                                    <option value="{{ user.id }}">{{ user.username }} ({{ user.role }})</option>
-                                {% endfor %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Tasks</h2>
+    <a href="{{ url_for('create_task') }}" class="btn btn-primary">+ Assign Task</a>
+</div>
+<div class="card">
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr><th>Title</th><th>Priority</th><th>Due Date</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td>{{ task.title }}</td>
+                    <td>{{ task.priority }}</td>
+                    <td>{{ task.due_date.strftime('%Y-%m-%d') }}</td>
+                    <td><span class="status-badge status-{{ task.status }}">{{ task.status }}</span></td>
+                    <td>
+                        {% if task.assigned_to == current_user.id or current_user.role == 'admin' %}
+                        <form method="POST" action="{{ url_for('update_task', id=task.id) }}" style="display: inline;">
+                            <select name="status" onchange="this.form.submit()" class="form-select form-select-sm">
+                                <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="in_progress" {% if task.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                <option value="completed" {% if task.status == 'completed' %}selected{% endif %}>Completed</option>
                             </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="due_date" class="form-label">Due Date *</label>
-                            <input type="date" class="form-control" id="due_date" name="due_date" required>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="priority" class="form-label">Priority</label>
-                            <select class="form-control" id="priority" name="priority">
-                                <option value="low">Low</option>
-                                <option value="medium" selected>Medium</option>
-                                <option value="high">High</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="meeting_id" class="form-label">Related Meeting (Optional)</label>
-                            <select class="form-control" id="meeting_id" name="meeting_id">
-                                <option value="">None</option>
-                                {% for meeting in meetings %}
-                                    <option value="{{ meeting.id }}">{{ meeting.title }} ({{ meeting.date_time.strftime('%Y-%m-%d') }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Assign Task</button>
-                    <a href="{{ url_for('view_tasks') }}" class="btn btn-secondary">Cancel</a>
-                </form>
-            </div>
-        </div>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}
