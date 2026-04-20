@@ -536,31 +536,124 @@ def reports():
                          completed_tasks=completed_tasks,
                          pending_tasks=pending_tasks)
 
+# ============ USER MANAGEMENT ROUTES ============
+
 @app.route('/users')
 @login_required
 def view_users():
+    """View all users (admin only)"""
     if current_user.role != 'admin':
-        flash('Access denied', 'danger')
+        flash('Access denied. Only admins can view users.', 'danger')
         return redirect(url_for('dashboard'))
-    users = User.query.all()
+    users = User.query.order_by(User.created_at.desc()).all()
     return render_template('users.html', users=users)
 
 @app.route('/user/create', methods=['POST'])
 @login_required
 def create_user():
+    """Create a new user (admin only)"""
     if current_user.role != 'admin':
-        flash('Access denied', 'danger')
+        flash('Access denied. Only admins can create users.', 'danger')
         return redirect(url_for('dashboard'))
-    user = User(
-        username=request.form['username'],
-        email=request.form['email'],
-        password=generate_password_hash(request.form['password']),
-        role=request.form['role'],
-        reminder_preference='email'
-    )
-    db.session.add(user)
-    db.session.commit()
-    flash(f'User {user.username} created!', 'success')
+    
+    # Get form data
+    username = request.form.get('username', '').strip()
+    email = request.form.get('email', '').strip()
+    password = request.form.get('password', '')
+    role = request.form.get('role', 'staff')
+    
+    # Validation
+    if not username or not email or not password:
+        flash('All fields are required.', 'danger')
+        return redirect(url_for('view_users'))
+    
+    # Check if username already exists
+    existing_user = User.query.filter_by(username=username).first()
+    if existing_user:
+        flash(f'Username "{username}" already exists. Please choose a different username.', 'danger')
+        return redirect(url_for('view_users'))
+    
+    # Check if email already exists
+    existing_email = User.query.filter_by(email=email).first()
+    if existing_email:
+        flash(f'Email "{email}" already exists. Please use a different email.', 'danger')
+        return redirect(url_for('view_users'))
+    
+    # Password length validation
+    if len(password) < 4:
+        flash('Password must be at least 4 characters long.', 'danger')
+        return redirect(url_for('view_users'))
+    
+    # Create new user
+    try:
+        user = User(
+            username=username,
+            email=email,
+            password=generate_password_hash(password),
+            role=role,
+            reminder_preference='email'
+        )
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        flash(f'User "{user.username}" has been created successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating user: {str(e)}', 'danger')
+    
+    return redirect(url_for('view_users'))
+
+@app.route('/user/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_user(id):
+    """Delete a user (admin only)"""
+    if current_user.role != 'admin':
+        flash('Access denied. Only admins can delete users.', 'danger')
+        return redirect(url_for('view_users'))
+    
+    user_to_delete = User.query.get_or_404(id)
+    
+    # Prevent admin from deleting themselves
+    if user_to_delete.id == current_user.id:
+        flash('You cannot delete your own account.', 'danger')
+        return redirect(url_for('view_users'))
+    
+    # Prevent deleting the default admin account
+    if user_to_delete.username == 'admin':
+        flash('Cannot delete the default admin account.', 'danger')
+        return redirect(url_for('view_users'))
+    
+    try:
+        username = user_to_delete.username
+        
+        # Handle related records before deletion
+        # 1. Update budgets submitted by this user
+        Budget.query.filter_by(submitted_by=user_to_delete.id).update({'submitted_by': None})
+        
+        # 2. Update meetings created by this user
+        Meeting.query.filter_by(created_by=user_to_delete.id).update({'created_by': None})
+        
+        # 3. Update tasks assigned to this user
+        Task.query.filter_by(assigned_to=user_to_delete.id).update({'assigned_to': None})
+        
+        # 4. Delete meeting attendance records
+        MeetingAttendance.query.filter_by(user_id=user_to_delete.id).delete()
+        
+        # 5. Delete calendar events
+        CalendarEvent.query.filter_by(user_id=user_to_delete.id).delete()
+        
+        # Finally delete the user
+        db.session.delete(user_to_delete)
+        db.session.commit()
+        
+        flash(f'User "{username}" has been deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting user: {str(e)}', 'danger')
+    
     return redirect(url_for('view_users'))
 
 # Initialize database
