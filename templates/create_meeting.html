@@ -1,12 +1,111 @@
 {% extends "base.html" %}
+
+{% block page_title %}Schedule Meeting{% endblock %}
+
 {% block content %}
-<h2>Schedule Meeting</h2>
-<form method="POST">
-    <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
-    <textarea name="description" class="form-control mb-2" placeholder="Description"></textarea>
-    <input type="datetime-local" name="date_time" class="form-control mb-2" required>
-    <input type="number" name="duration" class="form-control mb-2" placeholder="Duration (minutes)" value="60">
-    <input type="url" name="meeting_link" class="form-control mb-2" placeholder="Meeting Link">
-    <button type="submit" class="btn btn-primary">Schedule</button>
-</form>
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-calendar-plus me-2"></i> Schedule New Meeting
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Meeting Title *</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="date_time" class="form-label">Date & Time *</label>
+                            <input type="datetime-local" class="form-control" id="date_time" name="date_time" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="duration" class="form-label">Duration (minutes)</label>
+                            <input type="number" class="form-control" id="duration" name="duration" value="60">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="meeting_link" class="form-label">Meeting Link (Zoom/Google Meet)</label>
+                        <input type="url" class="form-control" id="meeting_link" name="meeting_link" placeholder="https://...">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location (if in-person)</label>
+                        <input type="text" class="form-control" id="location" name="location">
+                    </div>
+                    
+                    <!-- Invitees Selection -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-people"></i> Invite Attendees *
+                        </label>
+                        <div class="card border">
+                            <div class="card-body" style="max-height: 250px; overflow-y: auto;">
+                                {% for user in users %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="invitees" value="{{ user.id }}" id="user_{{ user.id }}">
+                                    <label class="form-check-label" for="user_{{ user.id }}">
+                                        <i class="bi bi-person-circle"></i>
+                                        <strong>{{ user.username }}</strong>
+                                        <span class="badge {% if user.role == 'admin' %}badge-approved{% else %}badge-in-progress{% endif %} ms-2">{{ user.role }}</span>
+                                        <br><small class="text-muted">{{ user.email }}</small>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <small class="text-muted mt-2 d-block">
+                            <i class="bi bi-info-circle"></i> Only selected users will be able to view this meeting
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-shield-lock"></i> <strong>Privacy Note:</strong> Only invited attendees will have access to this meeting's details.
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Schedule Meeting</button>
+                    <a href="{{ url_for('view_meetings') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Optional: Add select all functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('input[name="invitees"]');
+    if (checkboxes.length > 0) {
+        const selectAllBtn = document.createElement('button');
+        selectAllBtn.type = 'button';
+        selectAllBtn.className = 'btn btn-sm btn-outline-primary mb-2';
+        selectAllBtn.innerHTML = '<i class="bi bi-check-all"></i> Select All';
+        selectAllBtn.onclick = function() {
+            checkboxes.forEach(cb => cb.checked = true);
+        };
+        
+        const deselectAllBtn = document.createElement('button');
+        deselectAllBtn.type = 'button';
+        deselectAllBtn.className = 'btn btn-sm btn-outline-secondary mb-2 ms-2';
+        deselectAllBtn.innerHTML = '<i class="bi bi-x"></i> Deselect All';
+        deselectAllBtn.onclick = function() {
+            checkboxes.forEach(cb => cb.checked = false);
+        };
+        
+        const btnContainer = document.querySelector('.card-body .form-check:first-child');
+        if (btnContainer) {
+            btnContainer.parentElement.insertBefore(selectAllBtn, btnContainer);
+            btnContainer.parentElement.insertBefore(deselectAllBtn, btnContainer.nextSibling);
+        }
+    }
+});
+</script>
 {% endblock %}

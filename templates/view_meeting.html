@@ -1,7 +1,221 @@
 {% extends "base.html" %}
+
+{% block page_title %}Meeting Details{% endblock %}
+
 {% block content %}
-<h2>{{ meeting.title }}</h2>
-<p><strong>Date:</strong> {{ meeting.date_time.strftime('%Y-%m-%d %H:%M') }}</p>
-{% if meeting.meeting_link %}<p><strong>Link:</strong> <a href="{{ meeting.meeting_link }}">Join</a></p>{% endif %}
-<a href="{{ url_for('view_meetings') }}" class="btn btn-secondary">Back</a>
+<!-- Access Denied Message (shown if user not invited) -->
+{% if not has_access %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card text-center">
+            <div class="card-body py-5">
+                <i class="bi bi-shield-lock" style="font-size: 4rem; color: var(--primary-purple);"></i>
+                <h3 class="mt-3">Access Denied</h3>
+                <p class="text-muted">You are not invited to this meeting.</p>
+                <a href="{{ url_for('view_meetings') }}" class="btn btn-primary">Back to Meetings</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="bi bi-calendar-event"></i> Meeting Details
+    </h2>
+    <div>
+        <a href="{{ url_for('download_ical', id=meeting.id) }}" class="btn btn-ical me-2">
+            <i class="bi bi-calendar-download"></i> Add to Calendar (iCal)
+        </a>
+        <a href="{{ url_for('view_meetings') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Meetings
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle"></i> Meeting Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <h4 class="mb-3">{{ meeting.title }}</h4>
+                <hr>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p>
+                            <strong><i class="bi bi-calendar"></i> Date:</strong><br>
+                            {{ meeting.date_time.strftime('%A, %B %d, %Y') }}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p>
+                            <strong><i class="bi bi-clock"></i> Time:</strong><br>
+                            {{ meeting.date_time.strftime('%I:%M %p') }} ({{ meeting.duration }} minutes)
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p>
+                            <strong><i class="bi bi-person"></i> Organized by:</strong><br>
+                            {{ creator_name }}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p>
+                            <strong><i class="bi bi-bell"></i> Reminder:</strong><br>
+                            <span class="reminder-badge">
+                                <i class="bi bi-envelope"></i> Email sent 1 hour before
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                
+                {% if meeting.meeting_link %}
+                <div class="alert alert-success">
+                    <i class="bi bi-camera-video"></i> <strong>Join Meeting:</strong><br>
+                    <a href="{{ meeting.meeting_link }}" target="_blank" class="text-success">
+                        {{ meeting.meeting_link }}
+                    </a>
+                </div>
+                {% endif %}
+                
+                {% if meeting.location %}
+                <div class="alert alert-info">
+                    <i class="bi bi-geo-alt"></i> <strong>Location:</strong><br>
+                    {{ meeting.location }}
+                </div>
+                {% endif %}
+                
+                {% if meeting.description %}
+                <div class="mt-3">
+                    <strong><i class="bi bi-file-text"></i> Description:</strong>
+                    <p class="mt-2">{{ meeting.description }}</p>
+                </div>
+                {% endif %}
+                
+                <!-- Show edit button only for creator or admin -->
+                {% if meeting.created_by == current_user.id or current_user.role == 'admin' %}
+                <hr>
+                <div class="alert alert-warning">
+                    <i class="bi bi-pencil"></i> <strong>Organizer Options:</strong>
+                    <p class="mb-0 mt-1">You can invite more people using the "Invite More Attendees" section below.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Calendar Sync Options -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-check"></i> Calendar Integration
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>Add this meeting to your preferred calendar app:</p>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="d-grid">
+                            <a href="{{ url_for('download_ical', id=meeting.id) }}" class="btn btn-ical">
+                                <i class="bi bi-calendar-download"></i> Download iCal File
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="d-grid">
+                            <button class="btn btn-outline-primary" onclick="copyMeetingLink()">
+                                <i class="bi bi-link"></i> Copy Meeting Link
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Attendees Card (Shows all invited users) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-people"></i> Attendees ({{ attendees|length }})
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if attendees %}
+                    <div class="list-group">
+                    {% for att in attendees %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-person-circle"></i>
+                                <strong>{{ att.username }}</strong>
+                                <br>
+                                <small class="text-muted">{{ att.email }}</small>
+                            </div>
+                            <span class="badge {% if att.role == 'admin' %}badge-approved{% else %}badge-in-progress{% endif %}">
+                                {{ att.role }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center">No attendees yet.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Invite More Attendees (Only visible to creator/admin) -->
+        {% if meeting.created_by == current_user.id or current_user.role == 'admin' %}
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-plus"></i> Invite More Attendees
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('invite_to_meeting', id=meeting.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label">Select users to invite:</label>
+                        <select name="user_ids" multiple class="form-control" size="6" required>
+                            {% for user in all_users %}
+                                {% if user.id not in attendee_ids %}
+                                <option value="{{ user.id }}">
+                                    {{ user.username }} ({{ user.role }}) - {{ user.email }}
+                                </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted mt-2 d-block">
+                            Hold Ctrl (Windows) or Cmd (Mac) to select multiple users
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-envelope"></i> Send Invitations
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function copyMeetingLink() {
+    const meetingLink = "{{ meeting.meeting_link or request.url }}";
+    navigator.clipboard.writeText(meetingLink).then(function() {
+        alert('Meeting link copied to clipboard!');
+    }, function() {
+        alert('Failed to copy link. Please copy manually.');
+    });
+}
+</script>
+{% endif %}
 {% endblock %}
