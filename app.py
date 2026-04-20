@@ -9,6 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import uuid
 from werkzeug.utils import secure_filename
 from io import BytesIO
+from sqlalchemy import func, extract, cases
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-this')
@@ -428,6 +429,42 @@ END:VCALENDAR"""
         download_name=f'{meeting.title.replace(" ", "_")}.ics'
     )
 
+@app.route('/meeting/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_meeting(id):
+    """Delete a meeting (creator or admin only)"""
+    meeting = Meeting.query.get_or_404(id)
+    
+    # Check permission: only creator or admin can delete
+    if meeting.created_by != current_user.id and current_user.role != 'admin':
+        flash('You do not have permission to delete this meeting.', 'danger')
+        return redirect(url_for('view_meetings'))
+    
+    try:
+        meeting_title = meeting.title
+        
+        # Delete related records first
+        # 1. Delete meeting attendance records
+        MeetingAttendance.query.filter_by(meeting_id=meeting.id).delete()
+        
+        # 2. Delete calendar events for this meeting
+        CalendarEvent.query.filter_by(meeting_id=meeting.id).delete()
+        
+        # 3. Update tasks that reference this meeting
+        Task.query.filter_by(meeting_id=meeting.id).update({'meeting_id': None})
+        
+        # Finally delete the meeting
+        db.session.delete(meeting)
+        db.session.commit()
+        
+        flash(f'Meeting "{meeting_title}" has been deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting meeting: {str(e)}', 'danger')
+    
+    return redirect(url_for('view_meetings'))
+
 @app.route('/budgets')
 @login_required
 def view_budgets():
@@ -523,18 +560,155 @@ def reports():
     if current_user.role != 'admin':
         flash('Access denied', 'danger')
         return redirect(url_for('dashboard'))
+    
+    # ============ BUDGET REPORTS ============
     total_budgets = Budget.query.count()
+    pending_budgets = Budget.query.filter_by(status='pending').count()
+    approved_budgets_count = Budget.query.filter_by(status='approved').count()
+    rejected_budgets_count = Budget.query.filter_by(status='rejected').count()
+    
+    # Department-wise budget summary
+    from sqlalchemy import func
+    dept_budgets = db.session.query(
+        Budget.department,
+        func.count(Budget.id).label('count'),
+        func.sum(Budget.amount).label('total_amount'),
+        func.sum(case((Budget.status == 'approved', Budget.amount), else_=0)).label('approved_amount'),
+        func.sum(case((Budget.status == 'pending', Budget.amount), else_=0)).label('pending_amount')
+    ).group_by(Budget.department).all()
+    
+    # Total approved amount across all departments
     approved_budgets = Budget.query.filter_by(status='approved').all()
     total_approved_amount = sum(b.amount for b in approved_budgets)
+    
+    # ============ TASK REPORTS ============
     total_tasks = Task.query.count()
     completed_tasks = Task.query.filter_by(status='completed').count()
     pending_tasks = Task.query.filter_by(status='pending').count()
+    in_progress_tasks = Task.query.filter_by(status='in_progress').count()
+    
+    # Task completion rate
+    task_completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+    
+    # Tasks by priority
+    high_priority_tasks = Task.query.filter_by(priority='high', status='pending').count()
+    medium_priority_tasks = Task.query.filter_by(priority='medium', status='pending').count()
+    low_priority_tasks = Task.query.filter_by(priority='low', status='pending').count()
+    
+    # Tasks by assignee
+    tasks_by_user = db.session.query(
+        User.username,
+        func.count(Task.id).label('task_count'),
+        func.sum(case((Task.status == 'completed', 1), else_=0)).label('completed_count')
+    ).outerjoin(Task, User.id == Task.assigned_to)\
+     .group_by(User.id, User.username).all()
+    
+    # ============ MEETING REPORTS ============
+    total_meetings = Meeting.query.count()
+    upcoming_meetings = Meeting.query.filter(Meeting.date_time > datetime.utcnow()).count()
+    past_meetings = Meeting.query.filter(Meeting.date_time <= datetime.utcnow()).count()
+    
+    # Meetings by month (last 6 months)
+    from sqlalchemy import extract
+    meetings_by_month = db.session.query(
+        extract('year', Meeting.date_time).label('year'),
+        extract('month', Meeting.date_time).label('month'),
+        func.count(Meeting.id).label('count')
+    ).group_by('year', 'month').order_by('year', 'month').limit(6).all()
+    
+    # ============ ACTIVITY SUMMARY ============
+    # Recent activities (last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    
+    recent_budgets = Budget.query.filter(Budget.created_at >= thirty_days_ago).count()
+    recent_meetings = Meeting.query.filter(Meeting.created_at >= thirty_days_ago).count()
+    recent_tasks = Task.query.filter(Task.created_at >= thirty_days_ago).count()
+    completed_recent_tasks = Task.query.filter(
+        Task.status == 'completed',
+        Task.created_at >= thirty_days_ago
+    ).count()
+    
+    # Top performing departments (by approved budget amount)
+    top_departments = db.session.query(
+        Budget.department,
+        func.sum(Budget.amount).label('total')
+    ).filter(Budget.status == 'approved')\
+     .group_by(Budget.department)\
+     .order_by(func.sum(Budget.amount).desc()).limit(5).all()
+    
     return render_template('reports.html', 
+                         # Budget stats
                          total_budgets=total_budgets,
+                         pending_budgets=pending_budgets,
+                         approved_budgets_count=approved_budgets_count,
+                         rejected_budgets_count=rejected_budgets_count,
                          total_approved_amount=total_approved_amount,
+                         dept_budgets=dept_budgets,
+                         top_departments=top_departments,
+                         
+                         # Task stats
                          total_tasks=total_tasks,
                          completed_tasks=completed_tasks,
-                         pending_tasks=pending_tasks)
+                         pending_tasks=pending_tasks,
+                         in_progress_tasks=in_progress_tasks,
+                         task_completion_rate=task_completion_rate,
+                         high_priority_tasks=high_priority_tasks,
+                         medium_priority_tasks=medium_priority_tasks,
+                         low_priority_tasks=low_priority_tasks,
+                         tasks_by_user=tasks_by_user,
+                         
+                         # Meeting stats
+                         total_meetings=total_meetings,
+                         upcoming_meetings=upcoming_meetings,
+                         past_meetings=past_meetings,
+                         meetings_by_month=meetings_by_month,
+                         
+                         # Activity stats
+                         recent_budgets=recent_budgets,
+                         recent_meetings=recent_meetings,
+                         recent_tasks=recent_tasks,
+                         completed_recent_tasks=completed_recent_tasks)
+
+# Helper function for SQL CASE statement
+def case(whens, else_=None):
+    from sqlalchemy.sql import case as sql_case
+    return sql_case(whens, else_=else_)
+
+@app.route('/meeting/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_meeting(id):
+    """Delete a meeting (creator or admin only)"""
+    meeting = Meeting.query.get_or_404(id)
+    
+    # Check permission: only creator or admin can delete
+    if meeting.created_by != current_user.id and current_user.role != 'admin':
+        flash('You do not have permission to delete this meeting.', 'danger')
+        return redirect(url_for('view_meetings'))
+    
+    try:
+        meeting_title = meeting.title
+        
+        # Delete related records first
+        # 1. Delete meeting attendance records
+        MeetingAttendance.query.filter_by(meeting_id=meeting.id).delete()
+        
+        # 2. Delete calendar events for this meeting
+        CalendarEvent.query.filter_by(meeting_id=meeting.id).delete()
+        
+        # 3. Update tasks that reference this meeting
+        Task.query.filter_by(meeting_id=meeting.id).update({'meeting_id': None})
+        
+        # Finally delete the meeting
+        db.session.delete(meeting)
+        db.session.commit()
+        
+        flash(f'Meeting "{meeting_title}" has been deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting meeting: {str(e)}', 'danger')
+    
+    return redirect(url_for('view_meetings'))
 
 # ============ USER MANAGEMENT ROUTES ============
 

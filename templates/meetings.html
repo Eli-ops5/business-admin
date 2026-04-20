@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 flex-wrap">
     <h4 class="mb-2 mb-md-0">
-        <i class="bi bi-calendar"></i> Meetings
+        <i class="bi bi-calendar"></i> Meetings ({{ meetings|length }})
     </h4>
     <a href="{{ url_for('create_meeting') }}" class="btn btn-primary btn-sm">
         <i class="bi bi-plus"></i> Schedule Meeting
@@ -21,20 +21,32 @@
                     <h6 class="card-title mb-0 fw-bold">{{ meeting.title|truncate(30) }}</h6>
                     {% if meeting.meeting_link %}
                     <span class="badge bg-success">🔗 Link</span>
+                    {% elif meeting.location %}
+                    <span class="badge bg-info">📍 In-Person</span>
                     {% endif %}
                 </div>
+                
                 <p class="card-text small text-muted mb-2">
                     <i class="bi bi-calendar"></i> {{ meeting.date_time.strftime('%b %d, %Y') }}<br>
                     <i class="bi bi-clock"></i> {{ meeting.date_time.strftime('%I:%M %p') }} ({{ meeting.duration }} min)
                 </p>
-                <p class="card-text small">{{ meeting.description|truncate(60) }}</p>
+                
+                <p class="card-text small">{{ meeting.description|truncate(60) or 'No description' }}</p>
+                
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <small class="text-muted">
-                        <i class="bi bi-people"></i> By: {{ meeting.created_by }}
+                        <i class="bi bi-person"></i> {{ meeting.created_by }}
                     </small>
-                    <a href="{{ url_for('view_meeting', id=meeting.id) }}" class="btn btn-sm btn-primary">
-                        View <i class="bi bi-arrow-right"></i>
-                    </a>
+                    <div>
+                        <a href="{{ url_for('view_meeting', id=meeting.id) }}" class="btn btn-sm btn-primary me-1">
+                            View <i class="bi bi-arrow-right"></i>
+                        </a>
+                        {% if meeting.created_by == current_user.id or current_user.role == 'admin' %}
+                        <button type="button" class="btn btn-sm btn-danger" onclick="confirmDelete({{ meeting.id }}, '{{ meeting.title|replace("'", "\\'") }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -51,4 +63,64 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteMeetingModal" tabindex="-1" aria-labelledby="deleteMeetingModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteMeetingModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> Delete Meeting
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the meeting:</p>
+                <p class="fw-bold text-danger" id="deleteMeetingTitle"></p>
+                <div class="alert alert-warning small">
+                    <i class="bi bi-info-circle"></i> This action:
+                    <ul class="mb-0 mt-1">
+                        <li>Will permanently remove this meeting</li>
+                        <li>Will remove all attendance records</li>
+                        <li>Cannot be undone</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <form method="POST" action="" id="deleteMeetingForm" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Yes, Delete Meeting
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(meetingId, meetingTitle) {
+    document.getElementById('deleteMeetingTitle').textContent = meetingTitle;
+    document.getElementById('deleteMeetingForm').action = "{{ url_for('delete_meeting', id=0) }}".replace('0', meetingId);
+    var modal = new bootstrap.Modal(document.getElementById('deleteMeetingModal'));
+    modal.show();
+}
+</script>
+
+<style>
+@media (max-width: 576px) {
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+    }
+    .card-title {
+        font-size: 0.9rem;
+    }
+    .card-text {
+        font-size: 0.75rem;
+    }
+}
+</style>
 {% endblock %}
