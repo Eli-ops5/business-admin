@@ -209,11 +209,21 @@ def profile():
 @app.route('/calendar-sync')
 @login_required
 def calendar_sync():
-    """Generate iCal file for user's meetings"""
-    meetings = Meeting.query.join(MeetingAttendance).filter(
+    """Generate iCal file for user's meetings (only meetings user is invited to)"""
+    # Get meetings where user is invited
+    invited_meetings = Meeting.query.join(MeetingAttendance).filter(
         MeetingAttendance.user_id == current_user.id,
         Meeting.date_time > datetime.utcnow()
     ).order_by(Meeting.date_time).all()
+    
+    # Also include meetings created by user
+    created_meetings = Meeting.query.filter(
+        Meeting.created_by == current_user.id,
+        Meeting.date_time > datetime.utcnow()
+    ).all()
+    
+    # Combine and deduplicate
+    all_meetings = list(set(invited_meetings + created_meetings))
     
     cal_data = """BEGIN:VCALENDAR
 VERSION:2.0
@@ -222,7 +232,7 @@ CALSCALE:GREGORIAN
 METHOD:PUBLISH
 """
     
-    for meeting in meetings:
+    for meeting in all_meetings:
         dtstart = meeting.date_time.strftime('%Y%m%dT%H%M%SZ')
         dtend = (meeting.date_time + timedelta(minutes=meeting.duration)).strftime('%Y%m%dT%H%M%SZ')
         
@@ -251,8 +261,25 @@ END:VEVENT"""
 @app.route('/meetings')
 @login_required
 def view_meetings():
-    meetings = Meeting.query.order_by(Meeting.date_time.desc()).all()
-    return render_template('meetings.html', meetings=meetings)
+    """Show only meetings that user has access to"""
+    # Get meetings where user is invited
+    invited_meetings = Meeting.query.join(MeetingAttendance).filter(
+        MeetingAttendance.user_id == current_user.id
+    ).order_by(Meeting.date_time.desc()).all()
+    
+    # Get meetings created by user
+    created_meetings = Meeting.query.filter_by(
+        created_by=current_user.id
+    ).order_by(Meeting.date_time.desc()).all()
+    
+    # Combine and deduplicate
+    all_meetings = list(set(invited_meetings + created_meetings))
+    
+    # If admin, show all meetings
+    if current_user.role == 'admin':
+        all_meetings = Meeting.query.order_by(Meeting.date_time.desc()).all()
+    
+    return render_template('meetings.html', meetings=all_meetings)
 
 @app.route('/meeting/create', methods=['GET', 'POST'])
 @login_required
@@ -270,26 +297,92 @@ def create_meeting():
         db.session.add(meeting)
         db.session.commit()
         
+        # Add creator as attendee
         attendance = MeetingAttendance(meeting_id=meeting.id, user_id=current_user.id, status='confirmed')
         db.session.add(attendance)
         
-        staff_users = User.query.filter(User.role == 'staff').all()
-        for user in staff_users:
-            if user.id != current_user.id:
-                attendance = MeetingAttendance(meeting_id=meeting.id, user_id=user.id, status='invited')
+        # Add selected invitees
+        invitees = request.form.getlist('invitees')
+        for user_id in invitees:
+            if int(user_id) != current_user.id:  # Don't duplicate creator
+                attendance = MeetingAttendance(meeting_id=meeting.id, user_id=int(user_id), status='invited')
                 db.session.add(attendance)
         
         db.session.commit()
-        flash('Meeting scheduled successfully! Reminders will be sent 1 hour before.', 'success')
+        flash(f'Meeting scheduled successfully! {len(invitees)} people invited.', 'success')
         return redirect(url_for('view_meetings'))
-    return render_template('create_meeting.html')
+    
+    # Get all users for the invitee selection dropdown
+    users = User.query.all()
+    return render_template('create_meeting.html', users=users)
 
 @app.route('/meeting/<int:id>')
 @login_required
 def view_meeting(id):
     meeting = Meeting.query.get_or_404(id)
-    attendees = MeetingAttendance.query.filter_by(meeting_id=id).all()
-    return render_template('view_meeting.html', meeting=meeting, attendees=attendees)
+    
+    # Check if user has access (is invited or is creator or is admin)
+    attendance = MeetingAttendance.query.filter_by(
+        meeting_id=meeting.id, 
+        user_id=current_user.id
+    ).first()
+    
+    has_access = (attendance is not None) or (meeting.created_by == current_user.id) or (current_user.role == 'admin')
+    
+    if not has_access:
+        return render_template('view_meeting.html', meeting=meeting, has_access=False)
+    
+    # Get all attendees with their details
+    attendees = db.session.query(
+        User.id, User.username, User.email, User.role,
+        MeetingAttendance.status
+    ).join(MeetingAttendance, User.id == MeetingAttendance.user_id)\
+     .filter(MeetingAttendance.meeting_id == meeting.id).all()
+    
+    # Get creator name
+    creator = User.query.get(meeting.created_by)
+    creator_name = creator.username if creator else 'Unknown'
+    
+    # Get all users for invite dropdown
+    all_users = User.query.all()
+    attendee_ids = [att.id for att in attendees]
+    
+    return render_template('view_meeting.html', 
+                         meeting=meeting, 
+                         attendees=attendees,
+                         creator_name=creator_name,
+                         all_users=all_users,
+                         attendee_ids=attendee_ids,
+                         has_access=True)
+
+@app.route('/meeting/<int:id>/invite', methods=['POST'])
+@login_required
+def invite_to_meeting(id):
+    """Add more attendees to an existing meeting"""
+    meeting = Meeting.query.get_or_404(id)
+    
+    # Only creator or admin can invite
+    if meeting.created_by != current_user.id and current_user.role != 'admin':
+        flash('Only the meeting organizer can invite attendees.', 'danger')
+        return redirect(url_for('view_meeting', id=id))
+    
+    user_ids = request.form.getlist('user_ids')
+    invited_count = 0
+    
+    for user_id in user_ids:
+        existing = MeetingAttendance.query.filter_by(meeting_id=id, user_id=int(user_id)).first()
+        if not existing:
+            attendance = MeetingAttendance(
+                meeting_id=id,
+                user_id=int(user_id),
+                status='invited'
+            )
+            db.session.add(attendance)
+            invited_count += 1
+    
+    db.session.commit()
+    flash(f'{invited_count} new invitation(s) sent!', 'success')
+    return redirect(url_for('view_meeting', id=id))
 
 @app.route('/meeting/<int:id>/ical')
 @login_required
@@ -297,6 +390,7 @@ def download_ical(id):
     """Download single meeting as iCal file"""
     meeting = Meeting.query.get_or_404(id)
     
+    # Check access
     attendance = MeetingAttendance.query.filter_by(meeting_id=meeting.id, user_id=current_user.id).first()
     if not attendance and meeting.created_by != current_user.id and current_user.role != 'admin':
         flash('You are not invited to this meeting.', 'danger')
