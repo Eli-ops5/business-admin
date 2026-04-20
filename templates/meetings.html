@@ -1,20 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between">
     <h2>Meetings</h2>
-    <a href="{{ url_for('create_meeting') }}" class="btn btn-primary">+ Schedule Meeting</a>
+    <a href="{{ url_for('create_meeting') }}" class="btn btn-primary">+ Schedule</a>
 </div>
 <div class="row">
     {% for meeting in meetings %}
-    <div class="col-md-6 mb-3">
-        <div class="card">
+    <div class="col-md-6">
+        <div class="card mb-2">
             <div class="card-body">
                 <h5>{{ meeting.title }}</h5>
-                <p><strong>Date:</strong> {{ meeting.date_time.strftime('%Y-%m-%d %H:%M') }}</p>
-                {% if meeting.meeting_link %}
-                    <p><strong>Link:</strong> <a href="{{ meeting.meeting_link }}" target="_blank">Join Meeting</a></p>
-                {% endif %}
-                <a href="{{ url_for('view_meeting', id=meeting.id) }}" class="btn btn-sm btn-primary">Details</a>
+                <p>{{ meeting.date_time.strftime('%Y-%m-%d %H:%M') }}</p>
+                <a href="{{ url_for('view_meeting', id=meeting.id) }}" class="btn btn-sm btn-info">View</a>
             </div>
         </div>
     </div>

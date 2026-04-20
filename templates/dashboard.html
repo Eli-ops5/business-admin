@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 class="mb-4">Dashboard</h2>
-<div class="row mb-4">
-    <div class="col-md-3 mb-3">
+<h2>Dashboard</h2>
+<div class="row">
+    <div class="col-md-3">
         <div class="card bg-primary text-white">
             <div class="card-body">
                 <h5>Pending Budgets</h5>
@@ -10,48 +10,11 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-3">
         <div class="card bg-success text-white">
             <div class="card-body">
                 <h5>Approved Budgets</h5>
                 <h2>{{ approved_budgets }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Upcoming Meetings</h5>
-            </div>
-            <div class="card-body">
-                {% for meeting in upcoming_meetings %}
-                    <div class="mb-2">
-                        <strong>{{ meeting.title }}</strong><br>
-                        <small>{{ meeting.date_time.strftime('%Y-%m-%d %H:%M') }}</small>
-                    </div>
-                {% else %}
-                    <p>No upcoming meetings</p>
-                {% endfor %}
-                <a href="{{ url_for('create_meeting') }}" class="btn btn-primary btn-sm">Schedule Meeting</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>My Tasks</h5>
-            </div>
-            <div class="card-body">
-                {% for task in my_tasks %}
-                    <div class="mb-2">
-                        <strong>{{ task.title }}</strong><br>
-                        <small>Due: {{ task.due_date.strftime('%Y-%m-%d') }}</small>
-                    </div>
-                {% else %}
-                    <p>No pending tasks</p>
-                {% endfor %}
             </div>
         </div>
     </div>

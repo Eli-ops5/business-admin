@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between">
+    <h2>Budgets</h2>
+    <a href="{{ url_for('create_budget') }}" class="btn btn-primary">+ Submit</a>
+</div>
+<table class="table">
+    <thead>
+        <tr><th>Title</th><th>Amount</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {% for budget in budgets %}
+        <tr>
+            <td>{{ budget.title }}</td>
+            <td>${{ budget.amount }}</td>
+            <td>{{ budget.status }}</td>
+            <td><a href="{{ url_for('view_budget', id=budget.id) }}" class="btn btn-sm btn-info">View</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

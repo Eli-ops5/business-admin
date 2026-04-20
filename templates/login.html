@@ -1,27 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+<div class="row justify-content-center" style="margin-top: 100px;">
     <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white text-center">
-                <h4>Business Admin Login</h4>
-            </div>
+        <div class="card">
+            <div class="card-header bg-primary text-white">Login</div>
             <div class="card-body">
                 <form method="POST">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
+                    <input type="text" name="username" class="form-control mb-2" placeholder="Username" required>
+                    <input type="password" name="password" class="form-control mb-2" placeholder="Password" required>
                     <button type="submit" class="btn btn-primary w-100">Login</button>
                 </form>
                 <hr>
-                <div class="text-center">
-                    <small class="text-muted">Demo: admin/admin123 or staff/staff123</small>
-                </div>
+                <small>Demo: admin/admin123 or staff/staff123</small>
             </div>
         </div>
     </div>

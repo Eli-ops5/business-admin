@@ -1,29 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between">
-    <h2>Budget Details</h2>
-    <a href="{{ url_for('view_budgets') }}" class="btn btn-secondary">Back</a>
-</div>
-<div class="card mt-3">
-    <div class="card-body">
-        <h4>{{ budget.title }}</h4>
-        <p><strong>Amount:</strong> ${{ "%.2f"|format(budget.amount) }}</p>
-        <p><strong>Department:</strong> {{ budget.department or 'N/A' }}</p>
-        <p><strong>Status:</strong> <span class="status-badge status-{{ budget.status }}">{{ budget.status }}</span></p>
-        <p><strong>Description:</strong> {{ budget.description or 'No description' }}</p>
-        
-        {% if current_user.role == 'admin' and budget.status == 'pending' %}
-        <hr>
-        <h5>Review Budget</h5>
-        <form method="POST" action="{{ url_for('review_budget', id=budget.id) }}">
-            <div class="mb-3">
-                <label>Comments</label>
-                <textarea name="comments" class="form-control" rows="2"></textarea>
-            </div>
-            <button type="submit" name="action" value="approve" class="btn btn-success">Approve</button>
-            <button type="submit" name="action" value="reject" class="btn btn-danger">Reject</button>
-        </form>
-        {% endif %}
-    </div>
-</div>
+<h2>{{ budget.title }}</h2>
+<p><strong>Amount:</strong> ${{ budget.amount }}</p>
+<p><strong>Status:</strong> {{ budget.status }}</p>
+{% if current_user.role == 'admin' and budget.status == 'pending' %}
+<form method="POST" action="{{ url_for('review_budget', id=budget.id) }}">
+    <textarea name="comments" class="form-control mb-2" placeholder="Comments"></textarea>
+    <button type="submit" name="action" value="approve" class="btn btn-success">Approve</button>
+    <button type="submit" name="action" value="reject" class="btn btn-danger">Reject</button>
+</form>
+{% endif %}
 {% endblock %}

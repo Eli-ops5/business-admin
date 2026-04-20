@@ -10,12 +10,10 @@
         .sidebar { min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .sidebar .nav-link { color: rgba(255,255,255,0.8); padding: 0.75rem 1rem; margin: 0.2rem 0; border-radius: 10px; }
         .sidebar .nav-link:hover { background: rgba(255,255,255,0.1); color: white; }
-        .sidebar .nav-link.active { background: rgba(255,255,255,0.2); color: white; }
         .status-badge { padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; }
         .status-pending { background: #ffc107; color: #000; }
         .status-approved { background: #28a745; color: #fff; }
         .status-rejected { background: #dc3545; color: #fff; }
-        .status-completed { background: #28a745; color: #fff; }
     </style>
 </head>
 <body>
@@ -24,7 +22,7 @@
             <div class="col-md-2 p-0 sidebar">
                 <div class="text-center py-4">
                     <h4 class="text-white">BizAdmin</h4>
-                    <small class="text-white-50">{{ current_user.username }} ({{ current_user.role }})</small>
+                    <small class="text-white-50">{{ current_user.username }}</small>
                 </div>
                 <nav class="nav flex-column px-3">
                     <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
@@ -42,17 +40,14 @@
             <div class="col-md-10 p-0">
                 <nav class="navbar navbar-light bg-light px-4 shadow-sm">
                     <div class="container-fluid">
-                        <span class="navbar-brand mb-0 h1">Business Administration Portal</span>
+                        <span class="navbar-brand">Business Admin Portal</span>
                     </div>
                 </nav>
                 <div class="container-fluid p-4">
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             {% for category, message in messages %}
-                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                                    {{ message }}
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                </div>
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
                             {% endfor %}
                         {% endif %}
                     {% endwith %}

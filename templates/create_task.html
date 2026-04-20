@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Assign Task</h2>
+<form method="POST">
+    <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
+    <textarea name="description" class="form-control mb-2" placeholder="Description"></textarea>
+    <select name="assigned_to" class="form-control mb-2" required>
+        <option value="">Select User</option>
+        {% for user in users %}
+        <option value="{{ user.id }}">{{ user.username }}</option>
+        {% endfor %}
+    </select>
+    <input type="date" name="due_date" class="form-control mb-2" required>
+    <select name="priority" class="form-control mb-2">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+    </select>
+    <button type="submit" class="btn btn-primary">Assign</button>
+</form>
+{% endblock %}

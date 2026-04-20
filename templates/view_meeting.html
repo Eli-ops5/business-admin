@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ meeting.title }}</h2>
+<p><strong>Date:</strong> {{ meeting.date_time.strftime('%Y-%m-%d %H:%M') }}</p>
+{% if meeting.meeting_link %}<p><strong>Link:</strong> <a href="{{ meeting.meeting_link }}">Join</a></p>{% endif %}
+<a href="{{ url_for('view_meetings') }}" class="btn btn-secondary">Back</a>
+{% endblock %}

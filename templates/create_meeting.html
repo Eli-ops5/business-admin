@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Schedule Meeting</h2>
+<form method="POST">
+    <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
+    <textarea name="description" class="form-control mb-2" placeholder="Description"></textarea>
+    <input type="datetime-local" name="date_time" class="form-control mb-2" required>
+    <input type="number" name="duration" class="form-control mb-2" placeholder="Duration (minutes)" value="60">
+    <input type="url" name="meeting_link" class="form-control mb-2" placeholder="Meeting Link">
+    <button type="submit" class="btn btn-primary">Schedule</button>
+</form>
+{% endblock %}

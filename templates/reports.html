@@ -1,19 +1,8 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h2 class="mb-4">Reports & Analytics</h2>
-
-<div class="mb-4">
-    <a href="{{ url_for('export_pdf') }}" class="btn btn-danger">
-        <i class="bi bi-file-pdf"></i> Export as PDF
-    </a>
-    <a href="{{ url_for('export_excel') }}" class="btn btn-success">
-        <i class="bi bi-file-excel"></i> Export as Excel
-    </a>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3 mb-3">
+<h2>Reports</h2>
+<div class="row">
+    <div class="col-md-3">
         <div class="card bg-info text-white">
             <div class="card-body">
                 <h5>Total Budgets</h5>
@@ -21,79 +10,11 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-3">
         <div class="card bg-success text-white">
             <div class="card-body">
                 <h5>Approved Amount</h5>
-                <h2>${{ "%.0f"|format(total_approved_amount) }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <h5>Pending Tasks</h5>
-                <h2>{{ pending_tasks }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <h5>Completed Tasks</h5>
-                <h2>{{ completed_tasks }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Budget by Department</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Department</th>
-                                <th>Total Amount</th>
-                                <th># of Budgets</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for dept in departments %}
-                            <tr>
-                                <td>{{ dept[0] or 'Unspecified' }}</td>
-                                <td>${{ "%.2f"|format(dept[1] or 0) }}</td>
-                                <td>{{ dept[2] }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Meeting Statistics</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Total Meetings:</strong> {{ total_meetings }}</p>
-                <p><strong>Upcoming Meetings:</strong> {{ upcoming_meetings }}</p>
-                <hr>
-                <h6>Task Completion Rate</h6>
-                <div class="progress">
-                    {% set completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0 %}
-                    <div class="progress-bar bg-success" style="width: {{ completion_rate }}%">
-                        {{ "%.1f"|format(completion_rate) }}%
-                    </div>
-                </div>
+                <h2>${{ total_approved_amount }}</h2>
             </div>
         </div>
     </div>
