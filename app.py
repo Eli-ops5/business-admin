@@ -6,10 +6,7 @@ from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
-import pytz
 import uuid
-import json
-import requests
 from werkzeug.utils import secure_filename
 from io import BytesIO
 
@@ -42,7 +39,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='staff')
     calendar_sync = db.Column(db.Boolean, default=False)
-    reminder_preference = db.Column(db.String(20), default='email')  # email, none
+    reminder_preference = db.Column(db.String(20), default='email')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Budget(db.Model):
@@ -140,7 +137,6 @@ scheduler = BackgroundScheduler()
 def check_and_send_reminders():
     with app.app_context():
         now = datetime.utcnow()
-        # Send reminders 1 hour before meeting
         reminder_time = now + timedelta(hours=1)
         
         meetings = Meeting.query.filter(
@@ -154,8 +150,7 @@ def check_and_send_reminders():
             for attendee in attendees:
                 user = User.query.get(attendee.user_id)
                 if user and user.reminder_preference == 'email':
-                    if send_meeting_reminder(meeting, user):
-                        pass
+                    send_meeting_reminder(meeting, user)
             meeting.reminder_sent = True
             db.session.commit()
 
@@ -163,7 +158,8 @@ def check_and_send_reminders():
 scheduler.add_job(func=check_and_send_reminders, trigger="interval", minutes=30)
 scheduler.start()
 
-# Routes
+# ============ ROUTES ============
+
 @app.route('/')
 @login_required
 def dashboard():
@@ -217,29 +213,39 @@ def calendar_sync():
     meetings = Meeting.query.join(MeetingAttendance).filter(
         MeetingAttendance.user_id == current_user.id,
         Meeting.date_time > datetime.utcnow()
-    ).all()
+    ).order_by(Meeting.date_time).all()
     
     cal_data = """BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//KEN Admin//Calendar//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
 """
+    
     for meeting in meetings:
+        dtstart = meeting.date_time.strftime('%Y%m%dT%H%M%SZ')
+        dtend = (meeting.date_time + timedelta(minutes=meeting.duration)).strftime('%Y%m%dT%H%M%SZ')
+        
         cal_data += f"""
 BEGIN:VEVENT
+UID:{meeting.id}@kenadmin.com
+DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}
+DTSTART:{dtstart}
+DTEND:{dtend}
 SUMMARY:{meeting.title}
-DTSTART:{meeting.date_time.strftime('%Y%m%dT%H%M%S')}
-DTEND:{(meeting.date_time + timedelta(minutes=meeting.duration)).strftime('%Y%m%dT%H%M%S')}
 DESCRIPTION:{meeting.description or ''}
 LOCATION:{meeting.location or meeting.meeting_link or ''}
+STATUS:CONFIRMED
+SEQUENCE:0
 END:VEVENT"""
     
     cal_data += "\nEND:VCALENDAR"
     
     return send_file(
-        BytesIO(cal_data.encode()),
+        BytesIO(cal_data.encode('utf-8')),
         mimetype='text/calendar',
         as_attachment=True,
-        download_name='ken_admin_calendar.ics'
+        download_name=f'KEN_Admin_Calendar_{datetime.utcnow().strftime("%Y%m%d")}.ics'
     )
 
 @app.route('/meetings')
@@ -264,11 +270,9 @@ def create_meeting():
         db.session.add(meeting)
         db.session.commit()
         
-        # Add creator as attendee
         attendance = MeetingAttendance(meeting_id=meeting.id, user_id=current_user.id, status='confirmed')
         db.session.add(attendance)
         
-        # Add all staff as invited
         staff_users = User.query.filter(User.role == 'staff').all()
         for user in staff_users:
             if user.id != current_user.id:
@@ -290,24 +294,44 @@ def view_meeting(id):
 @app.route('/meeting/<int:id>/ical')
 @login_required
 def download_ical(id):
+    """Download single meeting as iCal file"""
     meeting = Meeting.query.get_or_404(id)
+    
+    attendance = MeetingAttendance.query.filter_by(meeting_id=meeting.id, user_id=current_user.id).first()
+    if not attendance and meeting.created_by != current_user.id and current_user.role != 'admin':
+        flash('You are not invited to this meeting.', 'danger')
+        return redirect(url_for('view_meetings'))
+    
+    dtstart = meeting.date_time.strftime('%Y%m%dT%H%M%SZ')
+    dtend = (meeting.date_time + timedelta(minutes=meeting.duration)).strftime('%Y%m%dT%H%M%SZ')
+    
     cal_data = f"""BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//KEN Admin//Meeting//EN
+CALSCALE:GREGORIAN
 BEGIN:VEVENT
+UID:{meeting.id}@kenadmin.com
+DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}
+DTSTART:{dtstart}
+DTEND:{dtend}
 SUMMARY:{meeting.title}
-DTSTART:{meeting.date_time.strftime('%Y%m%dT%H%M%S')}
-DTEND:{(meeting.date_time + timedelta(minutes=meeting.duration)).strftime('%Y%m%dT%H%M%S')}
 DESCRIPTION:{meeting.description or ''}
 LOCATION:{meeting.location or meeting.meeting_link or ''}
+STATUS:CONFIRMED
+SEQUENCE:0
+BEGIN:VALARM
+TRIGGER:-PT1H
+ACTION:DISPLAY
+DESCRIPTION:Reminder for {meeting.title}
+END:VALARM
 END:VEVENT
 END:VCALENDAR"""
     
     return send_file(
-        BytesIO(cal_data.encode()),
+        BytesIO(cal_data.encode('utf-8')),
         mimetype='text/calendar',
         as_attachment=True,
-        download_name=f'{meeting.title}.ics'
+        download_name=f'{meeting.title.replace(" ", "_")}.ics'
     )
 
 @app.route('/budgets')
@@ -457,99 +481,6 @@ with app.app_context():
         db.session.add(staff)
         db.session.commit()
         print("✅ KEN Admin initialized with default users")
-
-@app.route('/calendar-sync')
-@login_required
-def calendar_sync():
-    """Generate iCal file for user's meetings"""
-    from datetime import timedelta
-    from io import BytesIO
-    
-    # Get all meetings for this user
-    meetings = Meeting.query.join(MeetingAttendance).filter(
-        MeetingAttendance.user_id == current_user.id,
-        Meeting.date_time > datetime.utcnow()
-    ).all()
-    
-    cal_data = """BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//KEN Admin//Calendar//EN
-CALSCALE:GREGORIAN
-METHOD:PUBLISH
-"""
-    
-    for meeting in meetings:
-        dtstart = meeting.date_time.strftime('%Y%m%dT%H%M%SZ')
-        dtend = (meeting.date_time + timedelta(minutes=meeting.duration)).strftime('%Y%m%dT%H%M%SZ')
-        
-        cal_data += f"""
-BEGIN:VEVENT
-UID:{meeting.id}@kenadmin.com
-DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}
-DTSTART:{dtstart}
-DTEND:{dtend}
-SUMMARY:{meeting.title}
-DESCRIPTION:{meeting.description or ''}
-LOCATION:{meeting.location or meeting.meeting_link or ''}
-STATUS:CONFIRMED
-SEQUENCE:0
-END:VEVENT"""
-    
-    cal_data += "\nEND:VCALENDAR"
-    
-    return send_file(
-        BytesIO(cal_data.encode('utf-8')),
-        mimetype='text/calendar',
-        as_attachment=True,
-        download_name='ken_admin_calendar.ics'
-    )
-
-
-@app.route('/meeting/<int:id>/ical')
-@login_required
-def download_ical(id):
-    """Download single meeting as iCal file"""
-    from datetime import timedelta
-    from io import BytesIO
-    
-    meeting = Meeting.query.get_or_404(id)
-    
-    # Check if user is invited or creator
-    attendance = MeetingAttendance.query.filter_by(
-        meeting_id=meeting.id, 
-        user_id=current_user.id
-    ).first()
-    
-    if not attendance and meeting.created_by != current_user.id and current_user.role != 'admin':
-        flash('You are not invited to this meeting.', 'danger')
-        return redirect(url_for('view_meetings'))
-    
-    dtstart = meeting.date_time.strftime('%Y%m%dT%H%M%SZ')
-    dtend = (meeting.date_time + timedelta(minutes=meeting.duration)).strftime('%Y%m%dT%H%M%SZ')
-    
-    cal_data = f"""BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//KEN Admin//Meeting//EN
-CALSCALE:GREGORIAN
-BEGIN:VEVENT
-UID:{meeting.id}@kenadmin.com
-DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}
-DTSTART:{dtstart}
-DTEND:{dtend}
-SUMMARY:{meeting.title}
-DESCRIPTION:{meeting.description or ''}
-LOCATION:{meeting.location or meeting.meeting_link or ''}
-STATUS:CONFIRMED
-SEQUENCE:0
-END:VEVENT
-END:VCALENDAR"""
-    
-    return send_file(
-        BytesIO(cal_data.encode('utf-8')),
-        mimetype='text/calendar',
-        as_attachment=True,
-        download_name=f'{meeting.title.replace(" ", "_")}.ics'
-    )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
