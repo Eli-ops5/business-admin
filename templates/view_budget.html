@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Budget Details</h2>
+    <div>
+        <a href="{{ url_for('export_budget_pdf', id=budget.id) }}" class="btn btn-danger">Export PDF</a>
+        <a href="{{ url_for('view_budgets') }}" class="btn btn-secondary">Back</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h4>{{ budget.title }}</h4>
+        <hr>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Amount:</strong> ${{ "%.2f"|format(budget.amount) }}</p>
+                <p><strong>Department:</strong> {{ budget.department or 'N/A' }}</p>
+                <p><strong>Status:</strong> <span class="status-badge status-{{ budget.status }}">{{ budget.status }}</span></p>
+                <p><strong>Submitted By:</strong> User #{{ budget.submitted_by }}</p>
+                <p><strong>Submitted On:</strong> {{ budget.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Description:</strong></p>
+                <p>{{ budget.description or 'No description provided.' }}</p>
+            </div>
+        </div>
+        
+        {% if budget.review_comments %}
+        <div class="alert alert-info">
+            <strong>Review Comments:</strong> {{ budget.review_comments }}
+        </div>
+        {% endif %}
+        
+        {% if current_user.role == 'admin' and budget.status == 'pending' %}
+        <hr>
+        <h5>Review Budget</h5>
+        <form method="POST" action="{{ url_for('review_budget', id=budget.id) }}">
+            <div class="mb-3">
+                <label for="comments" class="form-label">Comments</label>
+                <textarea class="form-control" id="comments" name="comments" rows="2"></textarea>
+            </div>
+            <button type="submit" name="action" value="approve" class="btn btn-success">Approve</button>
+            <button type="submit" name="action" value="reject" class="btn btn-danger">Reject</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Attachments Section -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5>Attachments</h5>
+    </div>
+    <div class="card-body">
+        {% if attachments %}
+            <div class="list-group mb-3">
+            {% for attachment in attachments %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-paperclip"></i> {{ attachment.original_filename }}
+                        <small class="text-muted">({{ (attachment.file_size / 1024)|round|int }} KB)</small>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('download_attachment', id=attachment.id) }}" class="btn btn-sm btn-success">Download</a>
+                        <a href="{{ url_for('delete_attachment', id=attachment.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this attachment?')">Delete</a>
+                    </div>
+                </div>
+            {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted">No attachments yet.</p>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('upload_attachment', id=budget.id) }}" enctype="multipart/form-data">
+            <div class="mb-3">
+                <input type="file" class="form-control" name="file" required>
+                <small class="text-muted">Allowed: PDF, DOC, XLS, JPG, PNG, TXT (Max 16MB)</small>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Upload File</button>
+        </form>
+    </div>
+</div>
+
+<!-- History Section -->
+{% if history %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5>History</h5>
+    </div>
+    <div class="card-body">
+        <div class="list-group">
+            {% for h in history %}
+            <div class="list-group-item">
+                <strong>{{ h.action }}</strong> - {{ h.comment }}<br>
+                <small class="text-muted">By User #{{ h.user_id }} at {{ h.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">Schedule New Meeting</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Meeting Title *</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="date_time" class="form-label">Date & Time *</label>
+                            <input type="datetime-local" class="form-control" id="date_time" name="date_time" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="duration" class="form-label">Duration (minutes)</label>
+                            <input type="number" class="form-control" id="duration" name="duration" value="60">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="meeting_link" class="form-label">Meeting Link (Zoom/Google Meet)</label>
+                        <input type="url" class="form-control" id="meeting_link" name="meeting_link" placeholder="https://...">
+                    </div>
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location (if in-person)</label>
+                        <input type="text" class="form-control" id="location" name="location">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Schedule Meeting</button>
+                    <a href="{{ url_for('view_meetings') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

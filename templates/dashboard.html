@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">Dashboard</h2>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card card-stats bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Pending Budgets</h5>
+                <h2 class="display-4">{{ pending_budgets }}</h2>
+                <small>Awaiting approval</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card card-stats bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">Approved Budgets</h5>
+                <h2 class="display-4">{{ approved_budgets }}</h2>
+                <small>Total approved</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5>Quick Actions</h5>
+                <a href="{{ url_for('export_pdf') }}" class="btn btn-sm btn-danger">Export Reports PDF</a>
+                <a href="{{ url_for('export_excel') }}" class="btn btn-sm btn-success">Export Reports Excel</a>
+                <a href="{{ url_for('create_budget') }}" class="btn btn-sm btn-primary">Submit Budget</a>
+                <a href="{{ url_for('create_meeting') }}" class="btn btn-sm btn-info">Schedule Meeting</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Upcoming Meetings</h5>
+            </div>
+            <div class="card-body">
+                {% if upcoming_meetings %}
+                    <div class="list-group">
+                    {% for meeting in upcoming_meetings %}
+                        <a href="{{ url_for('view_meeting', id=meeting.id) }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ meeting.title }}</h6>
+                                <small>{{ meeting.date_time.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            {% if meeting.meeting_link %}
+                                <small class="text-muted">🔗 Meeting link available</small>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No upcoming meetings</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>My Pending Tasks</h5>
+            </div>
+            <div class="card-body">
+                {% if my_tasks %}
+                    <div class="list-group">
+                    {% for task in my_tasks %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ task.title }}</h6>
+                                <small class="text-danger">Due: {{ task.due_date.strftime('%Y-%m-%d') }}</small>
+                            </div>
+                            <small class="text-muted">Priority: {{ task.priority }}</small>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No pending tasks</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Budget Submissions</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr><th>Title</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for budget in recent_budgets %}
+                            <tr>
+                                <td>{{ budget.title }}</td>
+                                <td>${{ "%.2f"|format(budget.amount) }}</td>
+                                <td><span class="status-badge status-{{ budget.status }}">{{ budget.status }}</span></td>
+                                <td>{{ budget.created_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

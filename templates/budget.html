@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Budgets</h2>
+    <a href="{{ url_for('create_budget') }}" class="btn btn-primary">+ Submit Budget</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Department</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Submitted By</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for budget in budgets %}
+                    <tr>
+                        <td>{{ budget.title }}</td>
+                        <td>{{ budget.department or '-' }}</td>
+                        <td>${{ "%.2f"|format(budget.amount) }}</td>
+                        <td><span class="status-badge status-{{ budget.status }}">{{ budget.status }}</span></td>
+                        <td>User #{{ budget.submitted_by }}</td>
+                        <td>{{ budget.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <a href="{{ url_for('view_budget', id=budget.id) }}" class="btn btn-sm btn-info">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
