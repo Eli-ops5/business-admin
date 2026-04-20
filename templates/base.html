@@ -2,17 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>KEN Admin - Business Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        /* Purple, Black & White Theme */
         :root {
             --primary-purple: #6b46c0;
             --primary-purple-dark: #553c9a;
             --primary-purple-light: #9f7aea;
-            --primary-purple-bg: #faf5ff;
             --black: #1a1a1a;
             --black-light: #2d2d2d;
             --white: #ffffff;
@@ -29,38 +27,49 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--gray-light);
+            overflow-x: hidden;
         }
 
-        /* Sidebar - Purple Theme */
+        /* ========== MOBILE SIDEBAR (Collapsible) ========== */
         .sidebar {
-            min-height: 100vh;
+            position: fixed;
+            left: -280px;
+            top: 0;
+            width: 280px;
+            height: 100vh;
             background: linear-gradient(180deg, var(--primary-purple) 0%, var(--primary-purple-dark) 100%);
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            transition: left 0.3s ease-in-out;
+            z-index: 1050;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar.open {
+            left: 0;
         }
 
         .sidebar .logo {
             padding: 1.5rem;
             text-align: center;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            margin-bottom: 1rem;
         }
 
         .sidebar .logo h3 {
             color: var(--white);
             font-weight: bold;
             margin: 0;
+            font-size: 1.5rem;
         }
 
         .sidebar .logo p {
             color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             margin: 0;
         }
 
         .sidebar .user-info {
             text-align: center;
             padding: 1rem;
-            margin-bottom: 1rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -80,10 +89,12 @@
         .sidebar .user-info h6 {
             color: var(--white);
             margin: 0;
+            font-size: 0.9rem;
         }
 
         .sidebar .user-info small {
             color: rgba(255, 255, 255, 0.7);
+            font-size: 0.7rem;
         }
 
         .sidebar .nav-link {
@@ -93,75 +104,95 @@
             border-radius: 12px;
             transition: all 0.3s ease;
             font-weight: 500;
-        }
-
-        .sidebar .nav-link:hover {
-            background: rgba(255, 255, 255, 0.15);
-            color: var(--white);
-            transform: translateX(5px);
-        }
-
-        .sidebar .nav-link.active {
-            background: var(--white);
-            color: var(--primary-purple);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .sidebar .nav-link i {
-            margin-right: 10px;
             width: 22px;
+            font-size: 1.1rem;
         }
 
-        /* Top Navbar */
+        /* ========== MOBILE NAVBAR ========== */
+        .mobile-navbar {
+            background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-purple-dark) 100%);
+            padding: 0.8rem 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .menu-toggle {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* ========== OVERLAY ========== */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1045;
+            display: none;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* ========== MAIN CONTENT ========== */
+        .main-content {
+            margin-left: 280px;
+            transition: margin-left 0.3s ease;
+            min-height: 100vh;
+        }
+
+        /* ========== TOP NAVBAR (Desktop) ========== */
         .top-navbar {
             background: var(--white);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
             padding: 0.8rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 1030;
         }
 
         .top-navbar .page-title {
             color: var(--black);
             font-weight: 600;
             margin: 0;
+            font-size: 1.25rem;
         }
 
-        /* Cards */
+        /* ========== RESPONSIVE CARDS ========== */
         .card {
             border: none;
             border-radius: 16px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
+            margin-bottom: 1rem;
         }
 
-        .card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(107, 70, 193, 0.15);
-        }
-
-        .card-header {
-            background: var(--white);
-            border-bottom: 2px solid var(--gray);
-            padding: 1rem 1.25rem;
-            font-weight: 600;
-            color: var(--black);
-            border-radius: 16px 16px 0 0 !important;
-        }
-
-        /* Stats Cards */
         .stat-card {
             background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-purple-dark) 100%);
             color: var(--white);
             border-radius: 20px;
-            padding: 1.5rem;
-            transition: transform 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
+            padding: 1.25rem;
+            position: relative;
+            margin-bottom: 1rem;
         }
 
         .stat-card h3 {
-            font-size: 2rem;
+            font-size: 1.75rem;
             font-weight: bold;
             margin: 0;
         }
@@ -169,237 +200,282 @@
         .stat-card p {
             margin: 0;
             opacity: 0.9;
+            font-size: 0.85rem;
         }
 
         .stat-card i {
-            font-size: 2.5rem;
+            font-size: 2rem;
             opacity: 0.3;
             position: absolute;
-            right: 1.5rem;
+            right: 1rem;
             bottom: 1rem;
         }
 
-        /* Buttons */
-        .btn-primary {
-            background: var(--primary-purple);
-            border: none;
-            padding: 0.5rem 1.2rem;
-            border-radius: 10px;
-            transition: all 0.3s ease;
+        /* ========== RESPONSIVE TABLES ========== */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        .btn-primary:hover {
-            background: var(--primary-purple-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(107, 70, 193, 0.3);
-        }
-
-        .btn-outline-primary {
-            border: 2px solid var(--primary-purple);
-            color: var(--primary-purple);
-            border-radius: 10px;
-        }
-
-        .btn-outline-primary:hover {
-            background: var(--primary-purple);
-            border-color: var(--primary-purple);
-        }
-
-        /* Tables */
         .table {
-            margin: 0;
+            min-width: 500px;
         }
 
         .table thead th {
             background: var(--gray-light);
-            color: var(--black);
-            font-weight: 600;
-            border-bottom: 2px solid var(--gray);
-            padding: 1rem;
+            padding: 0.75rem;
+            font-size: 0.85rem;
         }
 
         .table tbody td {
-            padding: 1rem;
-            vertical-align: middle;
-            color: var(--black-light);
+            padding: 0.75rem;
+            font-size: 0.85rem;
         }
 
-        .table tbody tr:hover {
-            background: var(--primary-purple-bg);
-        }
-
-        /* Status Badges */
-        .badge {
-            padding: 0.35rem 0.75rem;
-            border-radius: 20px;
-            font-weight: 500;
-        }
-
-        .badge-pending {
-            background: #fef3c7;
-            color: #d97706;
-        }
-
-        .badge-approved {
-            background: #d1fae5;
-            color: #059669;
-        }
-
-        .badge-rejected {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-
-        .badge-completed {
-            background: #d1fae5;
-            color: #059669;
-        }
-
-        .badge-in-progress {
-            background: #dbeafe;
-            color: #3b82f6;
-        }
-
-        /* Alerts */
-        .alert {
-            border-radius: 12px;
-            border: none;
-        }
-
-        /* Forms */
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 1px solid var(--gray);
-            padding: 0.7rem 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary-purple);
-            box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1);
-        }
-
-        /* Meeting Cards */
+        /* ========== MEETING CARDS (Mobile Friendly) ========== */
         .meeting-card {
             background: var(--white);
-            border-radius: 16px;
+            border-radius: 12px;
             padding: 1rem;
-            margin-bottom: 1rem;
-            border-left: 4px solid var(--primary-purple);
-            transition: all 0.3s ease;
+            margin-bottom: 0.75rem;
+            border-left: 3px solid var(--primary-purple);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
-        .meeting-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transform: translateX(5px);
+        /* ========== FORM ELEMENTS ========== */
+        .form-control, .form-select {
+            border-radius: 10px;
+            padding: 0.6rem 0.9rem;
+            font-size: 0.9rem;
         }
 
-        /* Responsive */
+        .btn {
+            border-radius: 10px;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        /* ========== BADGES ========== */
+        .badge {
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+
+        /* ========== MOBILE RESPONSIVE BREAKPOINTS ========== */
         @media (max-width: 768px) {
             .sidebar {
-                min-height: auto;
+                left: -280px;
             }
+            
+            .sidebar.open {
+                left: 0;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .mobile-navbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            .top-navbar {
+                display: none;
+            }
+            
+            .container-fluid {
+                padding: 0.75rem;
+            }
+            
             .stat-card h3 {
                 font-size: 1.5rem;
             }
+            
+            .row {
+                margin-left: 0;
+                margin-right: 0;
+            }
+            
+            .col-md-3, .col-md-4, .col-md-6, .col-md-8 {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
         }
 
+        /* ========== TABLET BREAKPOINT ========== */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .sidebar {
+                width: 240px;
+            }
+            
+            .main-content {
+                margin-left: 240px;
+            }
+            
+            .stat-card h3 {
+                font-size: 1.25rem;
+            }
+        }
+
+        /* ========== UTILITIES ========== */
+        .cursor-pointer {
+            cursor: pointer;
+        }
+        
+        .text-purple {
+            color: var(--primary-purple);
+        }
+        
+        .bg-purple {
+            background: var(--primary-purple);
+        }
+        
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
         }
-
+        
         ::-webkit-scrollbar-track {
             background: var(--gray-light);
         }
-
+        
         ::-webkit-scrollbar-thumb {
             background: var(--primary-purple-light);
             border-radius: 4px;
         }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-purple);
-        }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-2 p-0 sidebar">
-                <div class="logo">
-                    <h3>✨ KEN Admin</h3>
-                    <p>Business Management</p>
-                </div>
-                
-                <div class="user-info">
-                    <div class="avatar">
-                        <i class="bi bi-person-fill"></i>
-                    </div>
-                    <h6>{{ current_user.username }}</h6>
-                    <small>{{ current_user.role|upper }}</small>
-                </div>
-                
-                <nav class="nav flex-column">
-                    <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                        <i class="bi bi-speedometer2"></i> Dashboard
-                    </a>
-                    <a class="nav-link {% if request.endpoint in ['view_budgets', 'create_budget'] %}active{% endif %}" href="{{ url_for('view_budgets') }}">
-                        <i class="bi bi-calculator"></i> Budgets
-                    </a>
-                    <a class="nav-link {% if request.endpoint in ['view_meetings', 'create_meeting'] %}active{% endif %}" href="{{ url_for('view_meetings') }}">
-                        <i class="bi bi-calendar"></i> Meetings
-                    </a>
-                    <a class="nav-link {% if request.endpoint in ['view_tasks', 'create_task'] %}active{% endif %}" href="{{ url_for('view_tasks') }}">
-                        <i class="bi bi-check2-square"></i> Tasks
-                    </a>
-                    {% if current_user.role == 'admin' %}
-                    <a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}" href="{{ url_for('reports') }}">
-                        <i class="bi bi-graph-up"></i> Reports
-                    </a>
-                    <a class="nav-link {% if request.endpoint == 'view_users' %}active{% endif %}" href="{{ url_for('view_users') }}">
-                        <i class="bi bi-people"></i> Users
-                    </a>
-                    {% endif %}
-                    <a class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">
-                        <i class="bi bi-person"></i> Profile
-                    </a>
-                    <a class="nav-link" href="{{ url_for('calendar_sync') }}">
-                        <i class="bi bi-calendar-plus"></i> Sync Calendar
-                    </a>
-                    <a class="nav-link text-danger" href="{{ url_for('logout') }}" style="color: rgba(255,255,255,0.8) !important;">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
-                </nav>
-            </div>
-            
-            <!-- Main content -->
-            <div class="col-md-10 p-0">
-                <div class="top-navbar">
-                    <h4 class="page-title">
-                        {% block page_title %}Dashboard{% endblock %}
-                    </h4>
-                </div>
-                
-                <div class="container-fluid p-4">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
-                                    <i class="bi bi-info-circle"></i> {{ message }}
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                    
-                    {% block content %}{% endblock %}
-                </div>
-            </div>
+    <!-- Mobile Navbar -->
+    <div class="mobile-navbar">
+        <button class="menu-toggle" onclick="toggleSidebar()">
+            <i class="bi bi-list"></i>
+        </button>
+        <div>
+            <strong style="color: white;">KEN Admin</strong>
+        </div>
+        <div>
+            <i class="bi bi-person-circle" style="color: white; font-size: 1.3rem;"></i>
         </div>
     </div>
+    
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="logo">
+            <h3>✨ KEN Admin</h3>
+            <p>Business Management</p>
+        </div>
+        
+        <div class="user-info">
+            <div class="avatar">
+                <i class="bi bi-person-fill"></i>
+            </div>
+            <h6>{{ current_user.username }}</h6>
+            <small>{{ current_user.role|upper }}</small>
+        </div>
+        
+        <nav class="nav flex-column">
+            <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}" onclick="closeSidebar()">
+                <i class="bi bi-speedometer2"></i> <span>Dashboard</span>
+            </a>
+            <a class="nav-link {% if request.endpoint in ['view_budgets', 'create_budget'] %}active{% endif %}" href="{{ url_for('view_budgets') }}" onclick="closeSidebar()">
+                <i class="bi bi-calculator"></i> <span>Budgets</span>
+            </a>
+            <a class="nav-link {% if request.endpoint in ['view_meetings', 'create_meeting'] %}active{% endif %}" href="{{ url_for('view_meetings') }}" onclick="closeSidebar()">
+                <i class="bi bi-calendar"></i> <span>Meetings</span>
+            </a>
+            <a class="nav-link {% if request.endpoint in ['view_tasks', 'create_task'] %}active{% endif %}" href="{{ url_for('view_tasks') }}" onclick="closeSidebar()">
+                <i class="bi bi-check2-square"></i> <span>Tasks</span>
+            </a>
+            {% if current_user.role == 'admin' %}
+            <a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}" href="{{ url_for('reports') }}" onclick="closeSidebar()">
+                <i class="bi bi-graph-up"></i> <span>Reports</span>
+            </a>
+            <a class="nav-link {% if request.endpoint == 'view_users' %}active{% endif %}" href="{{ url_for('view_users') }}" onclick="closeSidebar()">
+                <i class="bi bi-people"></i> <span>Users</span>
+            </a>
+            {% endif %}
+            <a class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}" onclick="closeSidebar()">
+                <i class="bi bi-person"></i> <span>Profile</span>
+            </a>
+            <a class="nav-link" href="{{ url_for('calendar_sync') }}" onclick="closeSidebar()">
+                <i class="bi bi-calendar-plus"></i> <span>Sync Calendar</span>
+            </a>
+            <a class="nav-link text-danger" href="{{ url_for('logout') }}" onclick="closeSidebar()" style="color: rgba(255,255,255,0.8) !important;">
+                <i class="bi bi-box-arrow-right"></i> <span>Logout</span>
+            </a>
+        </nav>
+    </div>
+    
+    <!-- Main content -->
+    <div class="main-content">
+        <div class="top-navbar">
+            <h4 class="page-title">
+                {% block page_title %}Dashboard{% endblock %}
+            </h4>
+        </div>
+        
+        <div class="container-fluid p-3 p-md-4">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
+                            <i class="bi bi-info-circle"></i> {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+        
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+        }
+        
+        // Close sidebar when window is resized to desktop size
+        window.addEventListener('resize', function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (window.innerWidth > 768) {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+        });
+        
+        // Close sidebar when clicking on a link (for mobile)
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (window.innerWidth <= 768) {
+                    setTimeout(() => {
+                        closeSidebar();
+                    }, 150);
+                }
+            });
+        });
+    </script>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

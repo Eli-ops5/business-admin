@@ -4,84 +4,83 @@
 
 {% block content %}
 <!-- Welcome Banner -->
-<div class="card bg-gradient mb-4" style="background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-purple-dark) 100%);">
+<div class="card bg-gradient mb-3 mb-md-4" style="background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-purple-dark) 100%);">
     <div class="card-body text-white">
         <div class="row align-items-center">
-            <div class="col-md-8">
-                <h2 class="mb-2">Welcome back, {{ current_user.username }}! 👋</h2>
-                <p class="mb-0 opacity-75">Here's what's happening with your business today.</p>
+            <div class="col-8 col-md-8">
+                <h5 class="mb-1">Welcome back, {{ current_user.username }}! 👋</h5>
+                <p class="mb-0 opacity-75 small">Here's what's happening today.</p>
             </div>
-            <div class="col-md-4 text-end">
-                <i class="bi bi-robot" style="font-size: 3rem; opacity: 0.5;"></i>
+            <div class="col-4 col-md-4 text-end">
+                <i class="bi bi-robot" style="font-size: 2rem; opacity: 0.5;"></i>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Stats Cards -->
-<div class="row mb-4">
-    <div class="col-md-4 mb-3">
-        <div class="stat-card position-relative">
+<!-- Stats Cards - Responsive Grid -->
+<div class="row g-2 g-md-3 mb-3 mb-md-4">
+    <div class="col-6 col-md-4">
+        <div class="stat-card">
             <i class="bi bi-calculator"></i>
-            <p>Pending Budgets</p>
-            <h3>{{ pending_budgets }}</h3>
+            <p class="small mb-0">Pending Budgets</p>
+            <h3 class="mb-0">{{ pending_budgets }}</h3>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
-        <div class="stat-card position-relative" style="background: linear-gradient(135deg, var(--black) 0%, var(--black-light) 100%);">
+    <div class="col-6 col-md-4">
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--black) 0%, var(--black-light) 100%);">
             <i class="bi bi-check-circle"></i>
-            <p>Approved Budgets</p>
-            <h3>{{ approved_budgets }}</h3>
+            <p class="small mb-0">Approved Budgets</p>
+            <h3 class="mb-0">{{ approved_budgets }}</h3>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
-        <div class="stat-card position-relative" style="background: linear-gradient(135deg, var(--primary-purple-dark) 0%, var(--primary-purple) 100%);">
+    <div class="col-6 col-md-4">
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--primary-purple-dark) 0%, var(--primary-purple) 100%);">
             <i class="bi bi-people"></i>
-            <p>Active Users</p>
-            <h3>{{ approved_budgets + pending_budgets }}</h3>
+            <p class="small mb-0">Active Users</p>
+            <h3 class="mb-0">{{ approved_budgets + pending_budgets }}</h3>
         </div>
     </div>
 </div>
 
-<div class="row">
+<!-- Two Column Layout - Responsive -->
+<div class="row g-2 g-md-3">
     <!-- Upcoming Meetings -->
-    <div class="col-md-6 mb-4">
+    <div class="col-12 col-md-6 mb-3 mb-md-4">
         <div class="card h-100">
-            <div class="card-header">
-                <i class="bi bi-calendar-event me-2"></i> Upcoming Meetings
-                <a href="{{ url_for('create_meeting') }}" class="btn btn-sm btn-primary float-end">
-                    <i class="bi bi-plus"></i> New Meeting
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                <span><i class="bi bi-calendar-event me-2"></i> Upcoming Meetings</span>
+                <a href="{{ url_for('create_meeting') }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus"></i> New
                 </a>
             </div>
-            <div class="card-body">
+            <div class="card-body p-2 p-md-3">
                 {% if upcoming_meetings %}
                     {% for meeting in upcoming_meetings %}
                     <div class="meeting-card">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="mb-1">{{ meeting.title }}</h6>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 small fw-bold">{{ meeting.title }}</h6>
                                 <small class="text-muted">
-                                    <i class="bi bi-clock"></i> {{ meeting.date_time.strftime('%A, %B %d at %I:%M %p') }}
+                                    <i class="bi bi-clock"></i> {{ meeting.date_time.strftime('%b %d, %I:%M %p') }}
                                 </small>
                                 {% if meeting.meeting_link %}
                                 <br><small class="text-purple">
-                                    <i class="bi bi-camera-video"></i> Virtual Meeting
+                                    <i class="bi bi-camera-video"></i> Virtual
                                 </small>
                                 {% endif %}
                             </div>
-                            <a href="{{ url_for('view_meeting', id=meeting.id) }}" class="btn btn-sm btn-outline-primary">
+                            <a href="{{ url_for('view_meeting', id=meeting.id) }}" class="btn btn-sm btn-outline-primary ms-2">
                                 View <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                    <div class="text-center py-4">
-                        <i class="bi bi-calendar-x" style="font-size: 3rem; color: var(--gray);"></i>
-                        <p class="mt-2 text-muted">No upcoming meetings</p>
-                        <a href="{{ url_for('create_meeting') }}" class="btn btn-primary btn-sm">
-                            Schedule One
-                        </a>
+                    <div class="text-center py-3">
+                        <i class="bi bi-calendar-x" style="font-size: 2rem; color: var(--gray);"></i>
+                        <p class="mt-2 text-muted small">No upcoming meetings</p>
+                        <a href="{{ url_for('create_meeting') }}" class="btn btn-primary btn-sm">Schedule One</a>
                     </div>
                 {% endif %}
             </div>
@@ -89,31 +88,31 @@
     </div>
     
     <!-- My Tasks -->
-    <div class="col-md-6 mb-4">
+    <div class="col-12 col-md-6 mb-3 mb-md-4">
         <div class="card h-100">
-            <div class="card-header">
-                <i class="bi bi-check2-square me-2"></i> My Pending Tasks
-                <a href="{{ url_for('create_task') }}" class="btn btn-sm btn-primary float-end">
-                    <i class="bi bi-plus"></i> Assign Task
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                <span><i class="bi bi-check2-square me-2"></i> My Tasks</span>
+                <a href="{{ url_for('create_task') }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus"></i> Assign
                 </a>
             </div>
-            <div class="card-body">
+            <div class="card-body p-2 p-md-3">
                 {% if my_tasks %}
                     {% for task in my_tasks %}
                     <div class="meeting-card">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="mb-1">{{ task.title }}</h6>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 small fw-bold">{{ task.title }}</h6>
                                 <small class="text-muted">
-                                    <i class="bi bi-calendar"></i> Due: {{ task.due_date.strftime('%b %d, %Y') }}
+                                    <i class="bi bi-calendar"></i> Due: {{ task.due_date.strftime('%b %d') }}
                                 </small>
                                 <br>
-                                <span class="badge {% if task.priority == 'high' %}badge-pending{% elif task.priority == 'medium' %}badge-in-progress{% else %}badge-approved{% endif %} mt-1">
-                                    {{ task.priority|upper }} Priority
+                                <span class="badge {% if task.priority == 'high' %}bg-danger{% elif task.priority == 'medium' %}bg-warning{% else %}bg-info{% endif %} mt-1">
+                                    {{ task.priority|upper }}
                                 </span>
                             </div>
                             <form method="POST" action="{{ url_for('update_task', id=task.id) }}">
-                                <select name="status" onchange="this.form.submit()" class="form-select form-select-sm" style="width: auto;">
+                                <select name="status" onchange="this.form.submit()" class="form-select form-select-sm" style="width: auto; font-size: 0.7rem;">
                                     <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>Pending</option>
                                     <option value="in_progress" {% if task.status == 'in_progress' %}selected{% endif %}>In Progress</option>
                                     <option value="completed" {% if task.status == 'completed' %}selected{% endif %}>Completed</option>
@@ -123,9 +122,9 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                    <div class="text-center py-4">
-                        <i class="bi bi-check-circle" style="font-size: 3rem; color: var(--gray);"></i>
-                        <p class="mt-2 text-muted">No pending tasks! 🎉</p>
+                    <div class="text-center py-3">
+                        <i class="bi bi-check-circle" style="font-size: 2rem; color: var(--gray);"></i>
+                        <p class="mt-2 text-muted small">No pending tasks! 🎉</p>
                     </div>
                 {% endif %}
             </div>
@@ -133,44 +132,42 @@
     </div>
 </div>
 
-<!-- Recent Budgets -->
+<!-- Recent Budgets - Horizontal Scroll on Mobile -->
 <div class="row">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <i class="bi bi-clock-history me-2"></i> Recent Budget Submissions
-                <a href="{{ url_for('create_budget') }}" class="btn btn-sm btn-primary float-end">
-                    <i class="bi bi-plus"></i> Submit Budget
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                <span><i class="bi bi-clock-history me-2"></i> Recent Budgets</span>
+                <a href="{{ url_for('create_budget') }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus"></i> Submit
                 </a>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table table-hover mb-0">
                         <thead>
                             <tr>
                                 <th>Title</th>
-                                <th>Department</th>
                                 <th>Amount</th>
                                 <th>Status</th>
-                                <th>Date</th>
+                                <th class="d-none d-md-table-cell">Date</th>
                                 <th>Action</th>
                             </thead>
                         <tbody>
                             {% for budget in recent_budgets %}
                             <tr>
-                                <td><strong>{{ budget.title }}</strong></td>
-                                <td>{{ budget.department or 'N/A' }}</td>
-                                <td>${{ "{:,.2f}".format(budget.amount) }}</td>
+                                <td><strong class="small">{{ budget.title|truncate(20) }}</strong></td>
+                                <td>${{ "{:,.0f}".format(budget.amount) }}</small></td>
                                 <td>
                                     {% if budget.status == 'pending' %}
-                                    <span class="badge badge-pending">Pending</span>
+                                    <span class="badge bg-warning text-dark">Pending</span>
                                     {% elif budget.status == 'approved' %}
-                                    <span class="badge badge-approved">Approved</span>
+                                    <span class="badge bg-success">Approved</span>
                                     {% else %}
-                                    <span class="badge badge-rejected">Rejected</span>
+                                    <span class="badge bg-danger">Rejected</span>
                                     {% endif %}
-                                </td>
-                                <td>{{ budget.created_at.strftime('%b %d, %Y') }}</td>
+                                </small>
+                                <td class="d-none d-md-table-cell small">{{ budget.created_at.strftime('%b %d') }}</td>
                                 <td>
                                     <a href="{{ url_for('view_budget', id=budget.id) }}" class="btn btn-sm btn-outline-primary">
                                         View
