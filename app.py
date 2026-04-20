@@ -1,18 +1,30 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import uuid
 from werkzeug.utils import secure_filename
 from io import BytesIO
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from openpyxl import Workbook
+import traceback
+
+# Try to import optional packages
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
+try:
+    from openpyxl import Workbook
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-this')
@@ -21,12 +33,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
+# Create upload folder
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
 
 # Models
-class User(db.Model, UserMixin):
+class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -45,6 +58,7 @@ class Budget(db.Model):
     reviewed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     review_comments = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Meeting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -102,6 +116,11 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'png', 'txt'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Routes
 @app.route('/')
 @login_required
 def dashboard():
@@ -124,12 +143,16 @@ def login():
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and check_password_hash(user.password, request.form['password']):
-            login_user(user)
-            flash(f'Welcome back, {user.username}!', 'success')
-            return redirect(url_for('dashboard'))
-        flash('Invalid username or password', 'danger')
+        try:
+            user = User.query.filter_by(username=request.form['username']).first()
+            if user and check_password_hash(user.password, request.form['password']):
+                login_user(user)
+                flash(f'Welcome back, {user.username}!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Invalid username or password', 'danger')
+        except Exception as e:
+            flash(f'Login error: {str(e)}', 'danger')
     
     return render_template('login.html')
 
@@ -179,7 +202,8 @@ def view_budget(id):
         flash('Access denied', 'danger')
         return redirect(url_for('view_budgets'))
     attachments = BudgetAttachment.query.filter_by(budget_id=id).all()
-    return render_template('view_budget.html', budget=budget, attachments=attachments)
+    history = BudgetHistory.query.filter_by(budget_id=id).order_by(BudgetHistory.timestamp.desc()).all()
+    return render_template('view_budget.html', budget=budget, attachments=attachments, history=history)
 
 @app.route('/budget/<int:id>/review', methods=['POST'])
 @login_required
@@ -202,6 +226,53 @@ def review_budget(id):
     
     db.session.commit()
     return redirect(url_for('view_budgets'))
+
+@app.route('/budget/<int:id>/upload', methods=['POST'])
+@login_required
+def upload_attachment(id):
+    budget = Budget.query.get_or_404(id)
+    
+    if 'file' not in request.files:
+        flash('No file selected', 'danger')
+        return redirect(url_for('view_budget', id=id))
+    
+    file = request.files['file']
+    if file.filename == '':
+        flash('No file selected', 'danger')
+        return redirect(url_for('view_budget', id=id))
+    
+    if file and allowed_file(file.filename):
+        original_filename = secure_filename(file.filename)
+        file_ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else ''
+        unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(filepath)
+        
+        attachment = BudgetAttachment(
+            budget_id=budget.id,
+            filename=unique_filename,
+            original_filename=original_filename,
+            file_size=os.path.getsize(filepath),
+            file_type=file_ext,
+            uploaded_by=current_user.id
+        )
+        db.session.add(attachment)
+        db.session.commit()
+        flash(f'File uploaded successfully!', 'success')
+    else:
+        flash('File type not allowed.', 'danger')
+    
+    return redirect(url_for('view_budget', id=id))
+
+@app.route('/budget/attachment/<int:id>/download')
+@login_required
+def download_attachment(id):
+    attachment = BudgetAttachment.query.get_or_404(id)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], attachment.filename)
+    if not os.path.exists(filepath):
+        flash('File not found', 'danger')
+        return redirect(url_for('view_budgets'))
+    return send_file(filepath, as_attachment=True, download_name=attachment.original_filename)
 
 @app.route('/meetings')
 @login_required
@@ -233,7 +304,22 @@ def create_meeting():
 def view_meeting(id):
     meeting = Meeting.query.get_or_404(id)
     tasks = Task.query.filter_by(meeting_id=id).all()
-    return render_template('view_meeting.html', meeting=meeting, tasks=tasks)
+    users = User.query.all()
+    return render_template('view_meeting.html', meeting=meeting, tasks=tasks, users=users)
+
+@app.route('/meeting/<int:id>/invite', methods=['POST'])
+@login_required
+def invite_to_meeting(id):
+    meeting = Meeting.query.get_or_404(id)
+    user_ids = request.form.getlist('user_ids')
+    for user_id in user_ids:
+        existing = MeetingAttendance.query.filter_by(meeting_id=id, user_id=int(user_id)).first()
+        if not existing:
+            attendance = MeetingAttendance(meeting_id=id, user_id=int(user_id), status='invited')
+            db.session.add(attendance)
+    db.session.commit()
+    flash('Invitations sent!', 'success')
+    return redirect(url_for('view_meeting', id=id))
 
 @app.route('/tasks')
 @login_required
@@ -262,7 +348,8 @@ def create_task():
         return redirect(url_for('view_tasks'))
     
     users = User.query.filter(User.id != current_user.id).all()
-    return render_template('create_task.html', users=users)
+    meetings = Meeting.query.all()
+    return render_template('create_task.html', users=users, meetings=meetings)
 
 @app.route('/task/<int:id>/update', methods=['POST'])
 @login_required
@@ -287,20 +374,24 @@ def reports():
     total_tasks = Task.query.count()
     completed_tasks = Task.query.filter_by(status='completed').count()
     pending_tasks = Task.query.filter_by(status='pending').count()
+    total_meetings = Meeting.query.count()
+    upcoming_meetings = Meeting.query.filter(Meeting.date_time > datetime.utcnow()).count()
     
     return render_template('reports.html',
                          total_budgets=total_budgets,
                          total_approved_amount=total_approved_amount,
                          total_tasks=total_tasks,
                          completed_tasks=completed_tasks,
-                         pending_tasks=pending_tasks)
+                         pending_tasks=pending_tasks,
+                         total_meetings=total_meetings,
+                         upcoming_meetings=upcoming_meetings)
 
 @app.route('/reports/export/pdf')
 @login_required
 def export_pdf():
-    if current_user.role != 'admin':
-        flash('Access denied', 'danger')
-        return redirect(url_for('dashboard'))
+    if not REPORTLAB_AVAILABLE:
+        flash('PDF export is not available', 'danger')
+        return redirect(url_for('reports'))
     
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
@@ -326,9 +417,9 @@ def export_pdf():
 @app.route('/reports/export/excel')
 @login_required
 def export_excel():
-    if current_user.role != 'admin':
-        flash('Access denied', 'danger')
-        return redirect(url_for('dashboard'))
+    if not OPENPYXL_AVAILABLE:
+        flash('Excel export is not available', 'danger')
+        return redirect(url_for('reports'))
     
     wb = Workbook()
     ws = wb.active
@@ -370,26 +461,49 @@ def create_user():
     flash('User created!', 'success')
     return redirect(url_for('view_users'))
 
-# Create tables and default users
+@app.route('/api/meetings')
+@login_required
+def api_meetings():
+    meetings = Meeting.query.all()
+    events = []
+    for meeting in meetings:
+        events.append({
+            'title': meeting.title,
+            'start': meeting.date_time.isoformat(),
+            'url': url_for('view_meeting', id=meeting.id)
+        })
+    return jsonify(events)
+
+# Initialize database and create default users
 with app.app_context():
-    db.create_all()
-    if not User.query.filter_by(username='admin').first():
-        admin = User(
-            username='admin',
-            email='admin@business.com',
-            password=generate_password_hash('admin123'),
-            role='admin'
-        )
-        db.session.add(admin)
-        staff = User(
-            username='staff',
-            email='staff@business.com',
-            password=generate_password_hash('staff123'),
-            role='staff'
-        )
-        db.session.add(staff)
-        db.session.commit()
-        print("✅ Default users created")
+    try:
+        db.create_all()
+        print("Database tables created successfully")
+        
+        # Create default admin if not exists
+        if not User.query.filter_by(username='admin').first():
+            admin = User(
+                username='admin',
+                email='admin@business.com',
+                password=generate_password_hash('admin123'),
+                role='admin'
+            )
+            db.session.add(admin)
+            
+            staff = User(
+                username='staff',
+                email='staff@business.com',
+                password=generate_password_hash('staff123'),
+                role='staff'
+            )
+            db.session.add(staff)
+            db.session.commit()
+            print("Default users created: admin/admin123, staff/staff123")
+        else:
+            print("Users already exist")
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+        traceback.print_exc()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
