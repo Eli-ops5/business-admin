@@ -1,7 +1,126 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h2>Profile</h2>
-<p><strong>Username:</strong> {{ current_user.username }}</p>
-<p><strong>Email:</strong> {{ current_user.email }}</p>
-<p><strong>Role:</strong> {{ current_user.role }}</p>
+<h2 class="mb-4">
+    <i class="bi bi-person-circle"></i> My Profile
+</h2>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person"></i> Account Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong><i class="bi bi-person"></i> Username:</strong> {{ current_user.username }}</p>
+                <p><strong><i class="bi bi-envelope"></i> Email:</strong> {{ current_user.email }}</p>
+                <p><strong><i class="bi bi-shield"></i> Role:</strong> 
+                    <span class="badge {% if current_user.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">
+                        {{ current_user.role }}
+                    </span>
+                </p>
+                <p><strong><i class="bi bi-calendar"></i> Member Since:</strong> 
+                    {{ current_user.created_at.strftime('%B %d, %Y') }}
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-gear"></i> Notification Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">
+                            <i class="bi bi-envelope"></i> Email Address
+                        </label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ current_user.email }}" required>
+                        <small class="text-muted">Used for meeting reminders and notifications</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="reminder_preference" class="form-label">
+                            <i class="bi bi-bell"></i> Meeting Reminders
+                        </label>
+                        <select class="form-control" id="reminder_preference" name="reminder_preference">
+                            <option value="email" {% if current_user.reminder_preference == 'email' %}selected{% endif %}>
+                                <i class="bi bi-envelope"></i> Email Reminders (1 hour before)
+                            </option>
+                            <option value="none" {% if current_user.reminder_preference == 'none' %}selected{% endif %}>
+                                <i class="bi bi-bell-slash"></i> No Reminders
+                            </option>
+                        </select>
+                        <small class="text-muted">You'll receive email reminders for meetings you're invited to</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-save"></i> Save Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-check"></i> Calendar Sync
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p>Sync all your meetings to your favorite calendar app:</p>
+                        <ul>
+                            <li><strong>Google Calendar</strong> - Import the .ics file or use the URL</li>
+                            <li><strong>Microsoft Outlook</strong> - Open the .ics file to add meetings</li>
+                            <li><strong>Apple Calendar</strong> - Import the .ics file</li>
+                            <li><strong>Mobile Devices</strong> - Download and tap to add</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <a href="{{ url_for('calendar_sync') }}" class="btn btn-success btn-lg mb-2 w-100">
+                            <i class="bi bi-calendar-plus"></i> Sync All Meetings
+                        </a>
+                        <small class="text-muted">Downloads .ics file with all your upcoming meetings</small>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="alert alert-secondary">
+                    <i class="bi bi-info-circle"></i> <strong>Pro Tip:</strong> 
+                    For automatic calendar sync, copy this URL into Google Calendar's "Add by URL" feature:
+                    <div class="input-group mt-2">
+                        <input type="text" class="form-control font-monospace small" 
+                               value="{{ url_for('calendar_sync', _external=True) }}" id="calendarUrl" readonly>
+                        <button class="btn btn-outline-primary" onclick="copyCalendarUrl()">
+                            <i class="bi bi-copy"></i> Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyCalendarUrl() {
+    const urlInput = document.getElementById('calendarUrl');
+    urlInput.select();
+    document.execCommand('copy');
+    alert('Calendar URL copied to clipboard! You can now add it to Google Calendar as an external calendar.');
+}
+</script>
 {% endblock %}
