@@ -651,6 +651,184 @@ def reports():
                          recent_tasks=recent_tasks,
                          completed_recent_tasks=completed_recent_tasks)
 
+# ============ EXPORT ROUTES ============
+
+@app.route('/reports/export/pdf')
+@login_required
+def export_pdf():
+    """Export reports as PDF"""
+    if current_user.role != 'admin':
+        flash('Access denied', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from io import BytesIO
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30)
+    story.append(Paragraph("KEN Admin - Business Report", title_style))
+    story.append(Paragraph(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
+    story.append(Spacer(1, 20))
+    
+    # Budgets Summary
+    story.append(Paragraph("Budgets Summary", styles['Heading2']))
+    budgets = Budget.query.all()
+    budget_data = [['Department', 'Title', 'Amount', 'Status', 'Date']]
+    for b in budgets:
+        budget_data.append([
+            b.department or 'N/A',
+            b.title[:30],
+            f'${b.amount:,.2f}',
+            b.status,
+            b.created_at.strftime('%Y-%m-%d')
+        ])
+    
+    budget_table = Table(budget_data)
+    budget_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+    ]))
+    story.append(budget_table)
+    story.append(Spacer(1, 20))
+    
+    # Tasks Summary
+    story.append(Paragraph("Tasks Summary", styles['Heading2']))
+    tasks = Task.query.all()
+    task_data = [['Title', 'Priority', 'Status', 'Due Date']]
+    for t in tasks:
+        task_data.append([t.title[:30], t.priority, t.status, t.due_date.strftime('%Y-%m-%d')])
+    
+    task_table = Table(task_data)
+    task_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(task_table)
+    
+    doc.build(story)
+    buffer.seek(0)
+    
+    return send_file(
+        buffer, 
+        as_attachment=True, 
+        download_name=f'KEN_Admin_Report_{datetime.now().strftime("%Y%m%d")}.pdf', 
+        mimetype='application/pdf'
+    )
+
+
+@app.route('/reports/export/excel')
+@login_required
+def export_excel():
+    """Export reports as Excel"""
+    if current_user.role != 'admin':
+        flash('Access denied', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from io import BytesIO
+    
+    wb = Workbook()
+    
+    # Budgets sheet
+    ws_budgets = wb.active
+    ws_budgets.title = "Budgets"
+    
+    # Headers
+    headers = ['ID', 'Department', 'Title', 'Amount', 'Status', 'Submitted By', 'Created At']
+    for col, header in enumerate(headers, 1):
+        cell = ws_budgets.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="6b46c0", end_color="6b46c0", fill_type="solid")
+        cell.font = Font(color="FFFFFF", bold=True)
+    
+    # Data
+    for row, budget in enumerate(Budget.query.all(), 2):
+        ws_budgets.cell(row=row, column=1, value=budget.id)
+        ws_budgets.cell(row=row, column=2, value=budget.department or 'N/A')
+        ws_budgets.cell(row=row, column=3, value=budget.title)
+        ws_budgets.cell(row=row, column=4, value=budget.amount)
+        ws_budgets.cell(row=row, column=5, value=budget.status)
+        ws_budgets.cell(row=row, column=6, value=budget.submitted_by)
+        ws_budgets.cell(row=row, column=7, value=budget.created_at.strftime('%Y-%m-%d %H:%M'))
+    
+    # Adjust column widths
+    for column in ws_budgets.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 30)
+        ws_budgets.column_dimensions[column_letter].width = adjusted_width
+    
+    # Tasks sheet
+    ws_tasks = wb.create_sheet("Tasks")
+    task_headers = ['ID', 'Title', 'Priority', 'Status', 'Assigned To', 'Due Date']
+    for col, header in enumerate(task_headers, 1):
+        cell = ws_tasks.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="6b46c0", end_color="6b46c0", fill_type="solid")
+        cell.font = Font(color="FFFFFF", bold=True)
+    
+    for row, task in enumerate(Task.query.all(), 2):
+        ws_tasks.cell(row=row, column=1, value=task.id)
+        ws_tasks.cell(row=row, column=2, value=task.title)
+        ws_tasks.cell(row=row, column=3, value=task.priority)
+        ws_tasks.cell(row=row, column=4, value=task.status)
+        ws_tasks.cell(row=row, column=5, value=task.assigned_to)
+        ws_tasks.cell(row=row, column=6, value=task.due_date.strftime('%Y-%m-%d'))
+    
+    # Meetings sheet
+    ws_meetings = wb.create_sheet("Meetings")
+    meeting_headers = ['ID', 'Title', 'Date & Time', 'Duration', 'Meeting Link', 'Location']
+    for col, header in enumerate(meeting_headers, 1):
+        cell = ws_meetings.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="6b46c0", end_color="6b46c0", fill_type="solid")
+        cell.font = Font(color="FFFFFF", bold=True)
+    
+    for row, meeting in enumerate(Meeting.query.all(), 2):
+        ws_meetings.cell(row=row, column=1, value=meeting.id)
+        ws_meetings.cell(row=row, column=2, value=meeting.title)
+        ws_meetings.cell(row=row, column=3, value=meeting.date_time.strftime('%Y-%m-%d %H:%M'))
+        ws_meetings.cell(row=row, column=4, value=meeting.duration)
+        ws_meetings.cell(row=row, column=5, value=meeting.meeting_link or 'N/A')
+        ws_meetings.cell(row=row, column=6, value=meeting.location or 'N/A')
+    
+    # Save to buffer
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    return send_file(
+        buffer, 
+        as_attachment=True, 
+        download_name=f'KEN_Admin_Report_{datetime.now().strftime("%Y%m%d")}.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
 # ============ USER MANAGEMENT ROUTES ============
 
 @app.route('/users')
