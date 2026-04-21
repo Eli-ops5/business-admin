@@ -37,7 +37,13 @@
         <div class="stat-card" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
             <i class="bi bi-check2-square"></i>
             <p class="small mb-0">Tasks Completed</p>
-            <h3 class="mb-0">{{ "%.0f"|format(task_completion_rate|default(0)) }}%</h3>
+            <h3 class="mb-0">
+                {% if total_tasks|default(0) > 0 %}
+                    {{ "%.0f"|format(completed_tasks|default(0) / total_tasks * 100) }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </h3>
         </div>
     </div>
     <div class="col-6 col-md-3">
@@ -71,14 +77,14 @@
                             {% for dept in dept_budgets|default([]) %}
                             <tr>
                                 <td><strong>{{ dept.department or 'Unspecified' }}</strong></td>
-                                <td>{{ dept.count }}</small>
+                                <td>{{ dept.count }}</td>
                                 <td class="fw-bold">${{ "{:,.0f}".format(dept.total_amount or 0) }}</small>
                                 <td class="text-success">${{ "{:,.0f}".format(dept.approved_amount or 0) }}</small>
                                 <td class="text-warning">${{ "{:,.0f}".format(dept.pending_amount or 0) }}</small>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="5" class="text-center text-muted">No budget data available</td>
+                                <td colspan="5" class="text-center text-muted">No budget data available</small>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -125,14 +131,23 @@
                 <i class="bi bi-exclamation-triangle"></i> Tasks by Priority
             </div>
             <div class="card-body">
-                {% set total = total_tasks|default(1) %}
+                {% if total_tasks|default(0) > 0 %}
+                    {% set high_width = (high_priority_tasks|default(0) / total_tasks * 100) %}
+                    {% set medium_width = (medium_priority_tasks|default(0) / total_tasks * 100) %}
+                    {% set low_width = (low_priority_tasks|default(0) / total_tasks * 100) %}
+                {% else %}
+                    {% set high_width = 0 %}
+                    {% set medium_width = 0 %}
+                    {% set low_width = 0 %}
+                {% endif %}
+                
                 <div class="mb-3">
                     <div class="d-flex justify-content-between">
                         <span>High Priority</span>
                         <span class="text-danger">{{ high_priority_tasks|default(0) }}</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-danger" style="width: {{ (high_priority_tasks|default(0) / total * 100) }}%"></div>
+                        <div class="progress-bar bg-danger" style="width: {{ high_width }}%"></div>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -141,7 +156,7 @@
                         <span class="text-warning">{{ medium_priority_tasks|default(0) }}</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-warning" style="width: {{ (medium_priority_tasks|default(0) / total * 100) }}%"></div>
+                        <div class="progress-bar bg-warning" style="width: {{ medium_width }}%"></div>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -150,7 +165,7 @@
                         <span class="text-info">{{ low_priority_tasks|default(0) }}</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-info" style="width: {{ (low_priority_tasks|default(0) / total * 100) }}%"></div>
+                        <div class="progress-bar bg-info" style="width: {{ low_width }}%"></div>
                     </div>
                 </div>
             </div>
@@ -217,12 +232,22 @@
                 <div class="text-center">
                     <small>Tasks completed: <strong>{{ completed_recent_tasks|default(0) }}</strong> / {{ recent_tasks|default(0) }}</small>
                     <div class="progress mt-1" style="height: 6px;">
-                        {% set recent_total = recent_tasks|default(1) %}
-                        <div class="progress-bar bg-success" style="width: {{ (completed_recent_tasks|default(0) / recent_total * 100) }}%"></div>
+                        {% if recent_tasks|default(0) > 0 %}
+                            {% set recent_width = (completed_recent_tasks|default(0) / recent_tasks * 100) %}
+                        {% else %}
+                            {% set recent_width = 0 %}
+                        {% endif %}
+                        <div class="progress-bar bg-success" style="width: {{ recent_width }}%"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+
+<!-- Debug Info (remove after testing) -->
+<div class="alert alert-success mt-3">
+    <i class="bi bi-check-circle"></i> Reports loaded successfully!
+    <small class="d-block text-muted">Total Tasks: {{ total_tasks|default(0) }}, Completed: {{ completed_tasks|default(0) }}</small>
 </div>
 {% endblock %}
