@@ -3,54 +3,56 @@
 {% block page_title %}Reports & Analytics{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-graph-up"></i> Reports & Analytics</h4>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <h4 class="mb-2 mb-md-0">
+        <i class="bi bi-graph-up"></i> Reports & Analytics
+    </h4>
     <div>
         <a href="{{ url_for('export_pdf') }}" class="btn btn-danger btn-sm">
-            <i class="bi bi-file-pdf"></i> PDF
+            <i class="bi bi-file-pdf"></i> PDF Export
         </a>
         <a href="{{ url_for('export_excel') }}" class="btn btn-success btn-sm">
-            <i class="bi bi-file-excel"></i> Excel
+            <i class="bi bi-file-excel"></i> Excel Export
         </a>
     </div>
 </div>
 
-<!-- ============ SUMMARY CARDS ============ -->
+<!-- Summary Cards -->
 <div class="row g-2 g-md-3 mb-4">
     <div class="col-6 col-md-3">
         <div class="stat-card">
             <i class="bi bi-calculator"></i>
             <p class="small mb-0">Total Budgets</p>
-            <h3 class="mb-0">{{ total_budgets }}</h3>
+            <h3 class="mb-0">{{ total_budgets|default(0) }}</h3>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="stat-card" style="background: linear-gradient(135deg, var(--black) 0%, var(--black-light) 100%);">
             <i class="bi bi-check-circle"></i>
             <p class="small mb-0">Approved Amount</p>
-            <h4 class="mb-0">${{ "{:,.0f}".format(total_approved_amount) }}</h4>
+            <h4 class="mb-0">${{ "{:,.0f}".format(total_approved_amount|default(0)) }}</h4>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="stat-card" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
             <i class="bi bi-check2-square"></i>
             <p class="small mb-0">Tasks Completed</p>
-            <h3 class="mb-0">{{ "%.0f"|format(task_completion_rate) }}%</h3>
+            <h3 class="mb-0">{{ "%.0f"|format(task_completion_rate|default(0)) }}%</h3>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="stat-card" style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);">
             <i class="bi bi-calendar"></i>
             <p class="small mb-0">Upcoming Meetings</p>
-            <h3 class="mb-0">{{ upcoming_meetings }}</h3>
+            <h3 class="mb-0">{{ upcoming_meetings|default(0) }}</h3>
         </div>
     </div>
 </div>
 
-<!-- ============ BUDGET BY DEPARTMENT ============ -->
+<!-- Budget by Department -->
 <div class="row mb-4">
-    <div class="col-12 col-md-6 mb-3 mb-md-0">
-        <div class="card h-100">
+    <div class="col-12">
+        <div class="card">
             <div class="card-header bg-primary text-white">
                 <i class="bi bi-pie-chart"></i> Budget by Department
             </div>
@@ -61,12 +63,12 @@
                             <tr>
                                 <th>Department</th>
                                 <th># Budgets</th>
-                                <th>Total</th>
+                                <th>Total Amount</th>
                                 <th>Approved</th>
                                 <th>Pending</th>
                             </thead>
                         <tbody>
-                            {% for dept in dept_budgets %}
+                            {% for dept in dept_budgets|default([]) %}
                             <tr>
                                 <td><strong>{{ dept.department or 'Unspecified' }}</strong></td>
                                 <td>{{ dept.count }}</small>
@@ -75,7 +77,9 @@
                                 <td class="text-warning">${{ "{:,.0f}".format(dept.pending_amount or 0) }}</small>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" class="text-center text-muted">No budget data available</td></tr>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No budget data available</td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -83,64 +87,40 @@
             </div>
         </div>
     </div>
-    
-    <!-- Top Departments -->
-    <div class="col-12 col-md-6">
-        <div class="card h-100">
-            <div class="card-header bg-success text-white">
-                <i class="bi bi-trophy"></i> Top 5 Departments (by Approved Budget)
-            </div>
-            <div class="card-body">
-                {% for dept in top_departments %}
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span><strong>{{ dept.department or 'Unspecified' }}</strong></span>
-                        <span class="text-success">${{ "{:,.0f}".format(dept.total or 0) }}</span>
-                    </div>
-                    <div class="progress" style="height: 8px;">
-                        {% set max_amount = top_departments[0].total if top_departments else 1 %}
-                        {% set percentage = (dept.total / max_amount * 100) if max_amount > 0 else 0 %}
-                        <div class="progress-bar bg-success" style="width: {{ percentage }}%"></div>
-                    </div>
-                </div>
-                {% else %}
-                <p class="text-muted text-center">No department data available</p>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
 </div>
 
-<!-- ============ TASK SUMMARY ============ -->
+<!-- Task Status -->
 <div class="row mb-4">
-    <div class="col-12 col-md-4 mb-3 mb-md-0">
-        <div class="card h-100">
+    <div class="col-12 col-md-6">
+        <div class="card">
             <div class="card-header bg-info text-white">
                 <i class="bi bi-check2-square"></i> Task Status
             </div>
             <div class="card-body">
-                <canvas id="taskStatusChart" height="200"></canvas>
-                <hr>
                 <div class="row text-center">
                     <div class="col-4">
                         <small class="text-muted">Pending</small>
-                        <h5 class="text-warning mb-0">{{ pending_tasks }}</h5>
+                        <h5 class="text-warning mb-0">{{ pending_tasks|default(0) }}</h5>
                     </div>
                     <div class="col-4">
                         <small class="text-muted">In Progress</small>
-                        <h5 class="text-info mb-0">{{ in_progress_tasks }}</h5>
+                        <h5 class="text-info mb-0">{{ in_progress_tasks|default(0) }}</h5>
                     </div>
                     <div class="col-4">
                         <small class="text-muted">Completed</small>
-                        <h5 class="text-success mb-0">{{ completed_tasks }}</h5>
+                        <h5 class="text-success mb-0">{{ completed_tasks|default(0) }}</h5>
                     </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <small>Total Tasks: <strong>{{ total_tasks|default(0) }}</strong></small>
                 </div>
             </div>
         </div>
     </div>
     
-    <div class="col-12 col-md-4 mb-3 mb-md-0">
-        <div class="card h-100">
+    <div class="col-12 col-md-6">
+        <div class="card">
             <div class="card-header bg-warning text-dark">
                 <i class="bi bi-exclamation-triangle"></i> Tasks by Priority
             </div>
@@ -148,71 +128,40 @@
                 <div class="mb-3">
                     <div class="d-flex justify-content-between">
                         <span>High Priority</span>
-                        <span class="text-danger">{{ high_priority_tasks }}</span>
+                        <span class="text-danger">{{ high_priority_tasks|default(0) }}</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-danger" style="width: {{ (high_priority_tasks / total_tasks * 100) if total_tasks > 0 else 0 }}%"></div>
+                        {% set total = total_tasks|default(1) %}
+                        <div class="progress-bar bg-danger" style="width: {{ (high_priority_tasks|default(0) / total * 100) }}%"></div>
                     </div>
                 </div>
                 <div class="mb-3">
                     <div class="d-flex justify-content-between">
                         <span>Medium Priority</span>
-                        <span class="text-warning">{{ medium_priority_tasks }}</span>
+                        <span class="text-warning">{{ medium_priority_tasks|default(0) }}</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-warning" style="width: {{ (medium_priority_tasks / total_tasks * 100) if total_tasks > 0 else 0 }}%"></div>
+                        <div class="progress-bar bg-warning" style="width: {{ (medium_priority_tasks|default(0) / total * 100) }}%"></div>
                     </div>
                 </div>
                 <div class="mb-3">
                     <div class="d-flex justify-content-between">
                         <span>Low Priority</span>
-                        <span class="text-info">{{ low_priority_tasks }}</span>
+                        <span class="text-info">{{ low_priority_tasks|default(0) }}</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-info" style="width: {{ (low_priority_tasks / total_tasks * 100) if total_tasks > 0 else 0 }}%"></div>
+                        <div class="progress-bar bg-info" style="width: {{ (low_priority_tasks|default(0) / total * 100) }}%"></div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-12 col-md-4">
-        <div class="card h-100">
-            <div class="card-header bg-secondary text-white">
-                <i class="bi bi-person-badge"></i> Tasks by User
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm mb-0">
-                        <thead>
-                            <tr><th>User</th><th>Assigned</th><th>Completed</th><th>Rate</th></tr>
-                        </thead>
-                        <tbody>
-                            {% for user in tasks_by_user %}
-                            <tr>
-                                <td>{{ user.username or 'Unassigned' }}</small>
-                                <td>{{ user.task_count or 0 }}</small>
-                                <td class="text-success">{{ user.completed_count or 0 }}</small>
-                                <td>
-                                    {% set rate = (user.completed_count / user.task_count * 100) if user.task_count > 0 else 0 %}
-                                    {{ "%.0f"|format(rate) }}%
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="4" class="text-center text-muted">No task data</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ============ MEETING SUMMARY ============ -->
+<!-- Meeting Summary -->
 <div class="row mb-4">
-    <div class="col-12 col-md-6 mb-3 mb-md-0">
-        <div class="card h-100">
+    <div class="col-12">
+        <div class="card">
             <div class="card-header bg-primary text-white">
                 <i class="bi bi-calendar"></i> Meeting Summary
             </div>
@@ -220,52 +169,18 @@
                 <div class="row text-center">
                     <div class="col-4">
                         <i class="bi bi-calendar-plus" style="font-size: 2rem;"></i>
-                        <h4>{{ total_meetings }}</h4>
+                        <h4>{{ total_meetings|default(0) }}</h4>
                         <small class="text-muted">Total</small>
                     </div>
                     <div class="col-4">
                         <i class="bi bi-calendar-check" style="font-size: 2rem; color: #059669;"></i>
-                        <h4>{{ upcoming_meetings }}</h4>
+                        <h4>{{ upcoming_meetings|default(0) }}</h4>
                         <small class="text-muted">Upcoming</small>
                     </div>
                     <div class="col-4">
                         <i class="bi bi-calendar-x" style="font-size: 2rem; color: #dc2626;"></i>
-                        <h4>{{ past_meetings }}</h4>
+                        <h4>{{ past_meetings|default(0) }}</h4>
                         <small class="text-muted">Past</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-12 col-md-6">
-        <div class="card h-100">
-            <div class="card-header bg-info text-white">
-                <i class="bi bi-activity"></i> Recent Activity (Last 30 Days)
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <i class="bi bi-calculator" style="font-size: 1.5rem;"></i>
-                        <h5>{{ recent_budgets }}</h5>
-                        <small class="text-muted">Budgets</small>
-                    </div>
-                    <div class="col-4">
-                        <i class="bi bi-calendar" style="font-size: 1.5rem;"></i>
-                        <h5>{{ recent_meetings }}</h5>
-                        <small class="text-muted">Meetings</small>
-                    </div>
-                    <div class="col-4">
-                        <i class="bi bi-check2-square" style="font-size: 1.5rem;"></i>
-                        <h5>{{ recent_tasks }}</h5>
-                        <small class="text-muted">Tasks</small>
-                    </div>
-                </div>
-                <hr>
-                <div class="text-center">
-                    <small class="text-muted">Tasks completed: <strong>{{ completed_recent_tasks }}</strong> / {{ recent_tasks }}</small>
-                    <div class="progress mt-1" style="height: 6px;">
-                        <div class="progress-bar bg-success" style="width: {{ (completed_recent_tasks / recent_tasks * 100) if recent_tasks > 0 else 0 }}%"></div>
                     </div>
                 </div>
             </div>
@@ -273,30 +188,41 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-// Task Status Chart
-const ctx = document.getElementById('taskStatusChart').getContext('2d');
-new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Pending', 'In Progress', 'Completed'],
-        datasets: [{
-            data: [{{ pending_tasks }}, {{ in_progress_tasks }}, {{ completed_tasks }}],
-            backgroundColor: ['#f59e0b', '#3b82f6', '#10b981'],
-            borderWidth: 0
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: { font: { size: 10 } }
-            }
-        }
-    }
-});
-</script>
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <i class="bi bi-activity"></i> Recent Activity (Last 30 Days)
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <i class="bi bi-calculator" style="font-size: 1.5rem;"></i>
+                        <h5>{{ recent_budgets|default(0) }}</h5>
+                        <small class="text-muted">Budgets</small>
+                    </div>
+                    <div class="col-4">
+                        <i class="bi bi-calendar" style="font-size: 1.5rem;"></i>
+                        <h5>{{ recent_meetings|default(0) }}</h5>
+                        <small class="text-muted">Meetings</small>
+                    </div>
+                    <div class="col-4">
+                        <i class="bi bi-check2-square" style="font-size: 1.5rem;"></i>
+                        <h5>{{ recent_tasks|default(0) }}</h5>
+                        <small class="text-muted">Tasks</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <small>Tasks completed: <strong>{{ completed_recent_tasks|default(0) }}</strong> / {{ recent_tasks|default(0) }}</small>
+                    <div class="progress mt-1" style="height: 6px;">
+                        {% set recent_total = recent_tasks|default(1) %}
+                        <div class="progress-bar bg-success" style="width: {{ (completed_recent_tasks|default(0) / recent_total * 100) }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
