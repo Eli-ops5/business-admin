@@ -259,6 +259,8 @@ END:VEVENT"""
         download_name=f'KEN_Admin_Calendar_{datetime.utcnow().strftime("%Y%m%d")}.ics'
     )
 
+# ============ MEETING ROUTES ============
+
 @app.route('/meetings')
 @login_required
 def view_meetings():
@@ -305,7 +307,7 @@ def create_meeting():
         # Add selected invitees
         invitees = request.form.getlist('invitees')
         for user_id in invitees:
-            if int(user_id) != current_user.id:  # Don't duplicate creator
+            if int(user_id) != current_user.id:
                 attendance = MeetingAttendance(meeting_id=meeting.id, user_id=int(user_id), status='invited')
                 db.session.add(attendance)
         
@@ -313,7 +315,6 @@ def create_meeting():
         flash(f'Meeting scheduled successfully! {len(invitees)} people invited.', 'success')
         return redirect(url_for('view_meetings'))
     
-    # Get all users for the invitee selection dropdown
     users = User.query.all()
     return render_template('create_meeting.html', users=users)
 
@@ -322,7 +323,7 @@ def create_meeting():
 def view_meeting(id):
     meeting = Meeting.query.get_or_404(id)
     
-    # Check if user has access (is invited or is creator or is admin)
+    # Check access
     attendance = MeetingAttendance.query.filter_by(
         meeting_id=meeting.id, 
         user_id=current_user.id
@@ -333,18 +334,15 @@ def view_meeting(id):
     if not has_access:
         return render_template('view_meeting.html', meeting=meeting, has_access=False)
     
-    # Get all attendees with their details
+    # Get attendees
     attendees = db.session.query(
         User.id, User.username, User.email, User.role,
         MeetingAttendance.status
     ).join(MeetingAttendance, User.id == MeetingAttendance.user_id)\
      .filter(MeetingAttendance.meeting_id == meeting.id).all()
     
-    # Get creator name
     creator = User.query.get(meeting.created_by)
     creator_name = creator.username if creator else 'Unknown'
-    
-    # Get all users for invite dropdown
     all_users = User.query.all()
     attendee_ids = [att.id for att in attendees]
     
@@ -362,7 +360,6 @@ def invite_to_meeting(id):
     """Add more attendees to an existing meeting"""
     meeting = Meeting.query.get_or_404(id)
     
-    # Only creator or admin can invite
     if meeting.created_by != current_user.id and current_user.role != 'admin':
         flash('Only the meeting organizer can invite attendees.', 'danger')
         return redirect(url_for('view_meeting', id=id))
@@ -373,11 +370,7 @@ def invite_to_meeting(id):
     for user_id in user_ids:
         existing = MeetingAttendance.query.filter_by(meeting_id=id, user_id=int(user_id)).first()
         if not existing:
-            attendance = MeetingAttendance(
-                meeting_id=id,
-                user_id=int(user_id),
-                status='invited'
-            )
+            attendance = MeetingAttendance(meeting_id=id, user_id=int(user_id), status='invited')
             db.session.add(attendance)
             invited_count += 1
     
@@ -391,7 +384,6 @@ def download_ical(id):
     """Download single meeting as iCal file"""
     meeting = Meeting.query.get_or_404(id)
     
-    # Check access
     attendance = MeetingAttendance.query.filter_by(meeting_id=meeting.id, user_id=current_user.id).first()
     if not attendance and meeting.created_by != current_user.id and current_user.role != 'admin':
         flash('You are not invited to this meeting.', 'danger')
@@ -435,7 +427,6 @@ def delete_meeting(id):
     """Delete a meeting (creator or admin only)"""
     meeting = Meeting.query.get_or_404(id)
     
-    # Check permission: only creator or admin can delete
     if meeting.created_by != current_user.id and current_user.role != 'admin':
         flash('You do not have permission to delete this meeting.', 'danger')
         return redirect(url_for('view_meetings'))
@@ -443,17 +434,10 @@ def delete_meeting(id):
     try:
         meeting_title = meeting.title
         
-        # Delete related records first
-        # 1. Delete meeting attendance records
         MeetingAttendance.query.filter_by(meeting_id=meeting.id).delete()
-        
-        # 2. Delete calendar events for this meeting
         CalendarEvent.query.filter_by(meeting_id=meeting.id).delete()
-        
-        # 3. Update tasks that reference this meeting
         Task.query.filter_by(meeting_id=meeting.id).update({'meeting_id': None})
         
-        # Finally delete the meeting
         db.session.delete(meeting)
         db.session.commit()
         
