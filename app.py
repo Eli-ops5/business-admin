@@ -132,6 +132,33 @@ KEN Admin Team
         print(f"Failed to send email: {e}")
         return False
 
+# Task status update notification
+def send_task_update_notification(task, user, old_status, new_status):
+    try:
+        msg = Message(
+            f'Task Updated: {task.title} - KEN Admin',
+            recipients=[user.email]
+        )
+        msg.body = f"""
+Hello {user.username},
+
+The status of your task has been updated.
+
+Task: {task.title}
+Old Status: {old_status}
+New Status: {new_status}
+
+View your tasks at: https://business-admin-1hpp.onrender.com/tasks
+
+Best regards,
+KEN Admin Team
+"""
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Failed to send update notification: {e}")
+        return False
+
 # Scheduled task to send reminders
 scheduler = BackgroundScheduler()
 
@@ -158,6 +185,43 @@ def check_and_send_reminders():
 # Start scheduler
 scheduler.add_job(func=check_and_send_reminders, trigger="interval", minutes=30)
 scheduler.start()
+
+
+# Task assignment notification function
+def send_task_assignment_notification(task, assigned_user, assigned_by_user):
+    try:
+        msg = Message(
+            f'New Task Assigned: {task.title} - KEN Admin',
+            recipients=[assigned_user.email]
+        )
+        msg.body = f"""
+Hello {assigned_user.username},
+
+A new task has been assigned to you by {assigned_by_user.username}.
+
+Task Details:
+━━━━━━━━━━━━━━━━━━━━━━
+Title: {task.title}
+Description: {task.description or 'No description provided'}
+Priority: {task.priority.upper()}
+Due Date: {task.due_date.strftime('%A, %B %d, %Y')}
+Status: {task.status}
+
+You can view and manage this task at:
+https://business-admin-1hpp.onrender.com/tasks
+
+━━━━━━━━━━━━━━━━━━━━━━
+Please complete this task by the due date.
+
+Best regards,
+KEN Admin Team
+"""
+        mail.send(msg)
+        print(f"✅ Task notification sent to {assigned_user.email}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send task notification: {e}")
+        return False
 
 # ============ ROUTES ============
 
@@ -533,10 +597,37 @@ def create_task():
 def update_task(id):
     task = Task.query.get_or_404(id)
     if task.assigned_to == current_user.id or current_user.role == 'admin':
-        task.status = request.form.get('status')
-        db.session.commit()
-        flash('Task updated!', 'success')
+        old_status = task.status
+        new_status = request.form.get('status')
+        
+        if old_status != new_status:
+            task.status = new_status
+            db.session.commit()
+            
+            # Notify the assigned user about status change
+            assigned_user = User.query.get(task.assigned_to)
+            if assigned_user and assigned_user.reminder_preference == 'email' and assigned_user.id != current_user.id:
+                send_task_update_notification(task, assigned_user, old_status, new_status)
+            
+            flash(f'Task updated from "{old_status}" to "{new_status}"!', 'success')
+        else:
+            flash('Task updated!', 'success')
+    
     return redirect(url_for('view_tasks'))
+
+@app.route('/api/check-new-tasks')
+@login_required
+def check_new_tasks():
+    """API endpoint for checking new tasks (for real-time notifications)"""
+    # Get tasks assigned in the last 5 minutes
+    five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
+    new_tasks = Task.query.filter(
+        Task.assigned_to == current_user.id,
+        Task.created_at >= five_minutes_ago,
+        Task.status == 'pending'
+    ).count()
+    
+    return jsonify({'new_tasks': new_tasks})
 
 @app.route('/reports')
 @login_required
