@@ -1,21 +1,57 @@
-{% extends "base.html" %}
-{% block content %}
-<h2>Assign Task</h2>
-<form method="POST">
-    <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
-    <textarea name="description" class="form-control mb-2" placeholder="Description"></textarea>
-    <select name="assigned_to" class="form-control mb-2" required>
-        <option value="">Select User</option>
-        {% for user in users %}
-        <option value="{{ user.id }}">{{ user.username }}</option>
-        {% endfor %}
-    </select>
-    <input type="date" name="due_date" class="form-control mb-2" required>
-    <select name="priority" class="form-control mb-2">
-        <option value="low">Low</option>
-        <option value="medium">Medium</option>
-        <option value="high">High</option>
-    </select>
-    <button type="submit" class="btn btn-primary">Assign</button>
-</form>
-{% endblock %}
+@app.route('/task/create', methods=['GET', 'POST'])
+@login_required
+def create_task():
+    if request.method == 'POST':
+        assigned_to_id = int(request.form['assigned_to'])
+        assigned_user = User.query.get(assigned_to_id)
+        
+        task = Task(
+            title=request.form['title'],
+            description=request.form.get('description', ''),
+            assigned_to=assigned_to_id,
+            assigned_by=current_user.id,
+            due_date=datetime.strptime(request.form['due_date'], '%Y-%m-%d'),
+            priority=request.form.get('priority', 'medium')
+        )
+        db.session.add(task)
+        db.session.commit()
+        
+        # Send email notification to assigned user
+        if assigned_user and assigned_user.reminder_preference == 'email':
+            send_task_assignment_notification(task, assigned_user, current_user)
+            flash(f'Task assigned successfully! Notification sent to {assigned_user.username}.', 'success')
+        else:
+            flash(f'Task assigned successfully! (No notification sent - user has reminders disabled)', 'success')
+        
+        return redirect(url_for('view_tasks'))
+    
+    users = User.query.filter(User.id != current_user.id).all()
+    meetings = Meeting.query.all()
+    return render_template('create_task.html', users=users, meetings=meetings)
+
+# Task status update notification
+def send_task_update_notification(task, user, old_status, new_status):
+    try:
+        msg = Message(
+            f'Task Updated: {task.title} - KEN Admin',
+            recipients=[user.email]
+        )
+        msg.body = f"""
+Hello {user.username},
+
+The status of your task has been updated.
+
+Task: {task.title}
+Old Status: {old_status}
+New Status: {new_status}
+
+View your tasks at: https://business-admin-1hpp.onrender.com/tasks
+
+Best regards,
+KEN Admin Team
+"""
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Failed to send update notification: {e}")
+        return False
