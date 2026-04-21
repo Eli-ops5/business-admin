@@ -659,21 +659,6 @@ def reports():
     if current_user.role != 'admin':
         flash('Access denied', 'danger')
         return redirect(url_for('dashboard'))
-
-@app.route('/test-email')
-@login_required
-def test_email():
-    """Test if email is working"""
-    try:
-        msg = Message(
-            'Test Email from KEN Admin',
-            recipients=[current_user.email]
-        )
-        msg.body = f"Hello {current_user.username},\n\nThis is a test email. Your email configuration is working!\n\nBest regards,\nKEN Admin Team"
-        mail.send(msg)
-        return "✅ Test email sent! Check your inbox."
-    except Exception as e:
-        return f"❌ Failed: {str(e)}"
     
     # ============ BUDGET REPORTS ============
     total_budgets = Budget.query.count()
