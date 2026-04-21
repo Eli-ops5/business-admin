@@ -102,7 +102,8 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Email reminder function
+# ============ NOTIFICATION FUNCTIONS ============
+
 def send_meeting_reminder(meeting, user):
     try:
         msg = Message(
@@ -121,8 +122,6 @@ Duration: {meeting.duration} minutes
 
 Join link: {meeting.meeting_link or 'No link provided'}
 
-You can view full details at: https://business-admin-1hpp.onrender.com/meeting/{meeting.id}
-
 Best regards,
 KEN Admin Team
 """
@@ -132,7 +131,35 @@ KEN Admin Team
         print(f"Failed to send email: {e}")
         return False
 
-# Task status update notification
+def send_task_assignment_notification(task, assigned_user, assigned_by_user):
+    try:
+        msg = Message(
+            f'New Task Assigned: {task.title} - KEN Admin',
+            recipients=[assigned_user.email]
+        )
+        msg.body = f"""
+Hello {assigned_user.username},
+
+A new task has been assigned to you by {assigned_by_user.username}.
+
+Task Details:
+Title: {task.title}
+Description: {task.description or 'No description provided'}
+Priority: {task.priority.upper()}
+Due Date: {task.due_date.strftime('%A, %B %d, %Y')}
+
+View your tasks at: https://business-admin-1hpp.onrender.com/tasks
+
+Best regards,
+KEN Admin Team
+"""
+        mail.send(msg)
+        print(f"✅ Task notification sent to {assigned_user.email}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send task notification: {e}")
+        return False
+
 def send_task_update_notification(task, user, old_status, new_status):
     try:
         msg = Message(
@@ -159,7 +186,7 @@ KEN Admin Team
         print(f"Failed to send update notification: {e}")
         return False
 
-# Scheduled task to send reminders
+# ============ SCHEDULER ============
 scheduler = BackgroundScheduler()
 
 def check_and_send_reminders():
@@ -182,46 +209,8 @@ def check_and_send_reminders():
             meeting.reminder_sent = True
             db.session.commit()
 
-# Start scheduler
 scheduler.add_job(func=check_and_send_reminders, trigger="interval", minutes=30)
 scheduler.start()
-
-
-# Task assignment notification function
-def send_task_assignment_notification(task, assigned_user, assigned_by_user):
-    try:
-        msg = Message(
-            f'New Task Assigned: {task.title} - KEN Admin',
-            recipients=[assigned_user.email]
-        )
-        msg.body = f"""
-Hello {assigned_user.username},
-
-A new task has been assigned to you by {assigned_by_user.username}.
-
-Task Details:
-━━━━━━━━━━━━━━━━━━━━━━
-Title: {task.title}
-Description: {task.description or 'No description provided'}
-Priority: {task.priority.upper()}
-Due Date: {task.due_date.strftime('%A, %B %d, %Y')}
-Status: {task.status}
-
-You can view and manage this task at:
-https://business-admin-1hpp.onrender.com/tasks
-
-━━━━━━━━━━━━━━━━━━━━━━
-Please complete this task by the due date.
-
-Best regards,
-KEN Admin Team
-"""
-        mail.send(msg)
-        print(f"✅ Task notification sent to {assigned_user.email}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to send task notification: {e}")
-        return False
 
 # ============ ROUTES ============
 
@@ -260,7 +249,6 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
-
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
@@ -275,20 +263,16 @@ def profile():
 @app.route('/calendar-sync')
 @login_required
 def calendar_sync():
-    """Generate iCal file for user's meetings (only meetings user is invited to)"""
-    # Get meetings where user is invited
     invited_meetings = Meeting.query.join(MeetingAttendance).filter(
         MeetingAttendance.user_id == current_user.id,
         Meeting.date_time > datetime.utcnow()
     ).order_by(Meeting.date_time).all()
     
-    # Also include meetings created by user
     created_meetings = Meeting.query.filter(
         Meeting.created_by == current_user.id,
         Meeting.date_time > datetime.utcnow()
     ).all()
     
-    # Combine and deduplicate
     all_meetings = list(set(invited_meetings + created_meetings))
     
     cal_data = """BEGIN:VCALENDAR
@@ -329,21 +313,16 @@ END:VEVENT"""
 @app.route('/meetings')
 @login_required
 def view_meetings():
-    """Show only meetings that user has access to"""
-    # Get meetings where user is invited
     invited_meetings = Meeting.query.join(MeetingAttendance).filter(
         MeetingAttendance.user_id == current_user.id
     ).order_by(Meeting.date_time.desc()).all()
     
-    # Get meetings created by user
     created_meetings = Meeting.query.filter_by(
         created_by=current_user.id
     ).order_by(Meeting.date_time.desc()).all()
     
-    # Combine and deduplicate
     all_meetings = list(set(invited_meetings + created_meetings))
     
-    # If admin, show all meetings
     if current_user.role == 'admin':
         all_meetings = Meeting.query.order_by(Meeting.date_time.desc()).all()
     
@@ -365,11 +344,9 @@ def create_meeting():
         db.session.add(meeting)
         db.session.commit()
         
-        # Add creator as attendee
         attendance = MeetingAttendance(meeting_id=meeting.id, user_id=current_user.id, status='confirmed')
         db.session.add(attendance)
         
-        # Add selected invitees
         invitees = request.form.getlist('invitees')
         for user_id in invitees:
             if int(user_id) != current_user.id:
@@ -388,7 +365,6 @@ def create_meeting():
 def view_meeting(id):
     meeting = Meeting.query.get_or_404(id)
     
-    # Check access
     attendance = MeetingAttendance.query.filter_by(
         meeting_id=meeting.id, 
         user_id=current_user.id
@@ -399,7 +375,6 @@ def view_meeting(id):
     if not has_access:
         return render_template('view_meeting.html', meeting=meeting, has_access=False)
     
-    # Get attendees
     attendees = db.session.query(
         User.id, User.username, User.email, User.role,
         MeetingAttendance.status
@@ -422,7 +397,6 @@ def view_meeting(id):
 @app.route('/meeting/<int:id>/invite', methods=['POST'])
 @login_required
 def invite_to_meeting(id):
-    """Add more attendees to an existing meeting"""
     meeting = Meeting.query.get_or_404(id)
     
     if meeting.created_by != current_user.id and current_user.role != 'admin':
@@ -446,7 +420,6 @@ def invite_to_meeting(id):
 @app.route('/meeting/<int:id>/ical')
 @login_required
 def download_ical(id):
-    """Download single meeting as iCal file"""
     meeting = Meeting.query.get_or_404(id)
     
     attendance = MeetingAttendance.query.filter_by(meeting_id=meeting.id, user_id=current_user.id).first()
@@ -489,7 +462,6 @@ END:VCALENDAR"""
 @app.route('/meeting/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_meeting(id):
-    """Delete a meeting (creator or admin only)"""
     meeting = Meeting.query.get_or_404(id)
     
     if meeting.created_by != current_user.id and current_user.role != 'admin':
@@ -513,6 +485,8 @@ def delete_meeting(id):
         flash(f'Error deleting meeting: {str(e)}', 'danger')
     
     return redirect(url_for('view_meetings'))
+
+# ============ BUDGET ROUTES ============
 
 @app.route('/budgets')
 @login_required
@@ -565,6 +539,8 @@ def review_budget(id):
     db.session.commit()
     return redirect(url_for('view_budgets'))
 
+# ============ TASK ROUTES ============
+
 @app.route('/tasks')
 @login_required
 def view_tasks():
@@ -581,9 +557,6 @@ def create_task():
         assigned_to_id = int(request.form['assigned_to'])
         assigned_user = User.query.get(assigned_to_id)
         
-        print(f"📝 Creating task for user: {assigned_user.username if assigned_user else 'Unknown'}")
-        print(f"📧 User reminder preference: {assigned_user.reminder_preference if assigned_user else 'None'}")
-        
         task = Task(
             title=request.form['title'],
             description=request.form.get('description', ''),
@@ -595,27 +568,18 @@ def create_task():
         db.session.add(task)
         db.session.commit()
         
-        print(f"✅ Task created with ID: {task.id}")
-        
-        # Send email notification to assigned user
         if assigned_user and assigned_user.reminder_preference == 'email':
-            print("📧 Attempting to send email...")
-            email_sent = send_task_assignment_notification(task, assigned_user, current_user)
-            if email_sent:
-                print("✅ Email sent successfully!")
-                flash(f'Task assigned successfully! Email notification sent to {assigned_user.username}.', 'success')
-            else:
-                print("❌ Email failed to send!")
-                flash(f'Task assigned successfully! (Email failed to send - check email configuration)', 'warning')
+            send_task_assignment_notification(task, assigned_user, current_user)
+            flash(f'Task assigned! Notification sent to {assigned_user.username}.', 'success')
         else:
-            print(f"⚠️ No email sent - reminder_preference = {assigned_user.reminder_preference if assigned_user else 'None'}")
-            flash(f'Task assigned successfully! (No notification sent - user has reminders disabled)', 'info')
+            flash(f'Task assigned successfully!', 'success')
         
         return redirect(url_for('view_tasks'))
     
     users = User.query.filter(User.id != current_user.id).all()
     meetings = Meeting.query.all()
     return render_template('create_task.html', users=users, meetings=meetings)
+
 @app.route('/task/<int:id>/update', methods=['POST'])
 @login_required
 def update_task(id):
@@ -628,7 +592,6 @@ def update_task(id):
             task.status = new_status
             db.session.commit()
             
-            # Notify the assigned user about status change
             assigned_user = User.query.get(task.assigned_to)
             if assigned_user and assigned_user.reminder_preference == 'email' and assigned_user.id != current_user.id:
                 send_task_update_notification(task, assigned_user, old_status, new_status)
@@ -642,16 +605,15 @@ def update_task(id):
 @app.route('/api/check-new-tasks')
 @login_required
 def check_new_tasks():
-    """API endpoint for checking new tasks (for real-time notifications)"""
-    # Get tasks assigned in the last 5 minutes
     five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
     new_tasks = Task.query.filter(
         Task.assigned_to == current_user.id,
         Task.created_at >= five_minutes_ago,
         Task.status == 'pending'
     ).count()
-    
     return jsonify({'new_tasks': new_tasks})
+
+# ============ REPORTS ROUTE ============
 
 @app.route('/reports')
 @login_required
@@ -660,13 +622,12 @@ def reports():
         flash('Access denied', 'danger')
         return redirect(url_for('dashboard'))
     
-    # ============ BUDGET REPORTS ============
+    # Budget Reports
     total_budgets = Budget.query.count()
     pending_budgets = Budget.query.filter_by(status='pending').count()
     approved_budgets_count = Budget.query.filter_by(status='approved').count()
     rejected_budgets_count = Budget.query.filter_by(status='rejected').count()
     
-    # Department-wise budget summary
     dept_budgets = db.session.query(
         Budget.department,
         func.count(Budget.id).label('count'),
@@ -675,46 +636,39 @@ def reports():
         func.sum(case((Budget.status == 'pending', Budget.amount), else_=0)).label('pending_amount')
     ).group_by(Budget.department).all()
     
-    # Total approved amount across all departments
-    approved_budgets = Budget.query.filter_by(status='approved').all()
-    total_approved_amount = sum(b.amount for b in approved_budgets)
+    approved_budgets_list = Budget.query.filter_by(status='approved').all()
+    total_approved_amount = sum(b.amount for b in approved_budgets_list) if approved_budgets_list else 0
     
-    # ============ TASK REPORTS ============
+    # Task Reports
     total_tasks = Task.query.count()
     completed_tasks = Task.query.filter_by(status='completed').count()
     pending_tasks = Task.query.filter_by(status='pending').count()
     in_progress_tasks = Task.query.filter_by(status='in_progress').count()
     
-    # Task completion rate
     task_completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
     
-    # Tasks by priority
     high_priority_tasks = Task.query.filter_by(priority='high', status='pending').count()
     medium_priority_tasks = Task.query.filter_by(priority='medium', status='pending').count()
     low_priority_tasks = Task.query.filter_by(priority='low', status='pending').count()
     
-    # Tasks by assignee
     tasks_by_user = db.session.query(
         User.username,
         func.count(Task.id).label('task_count'),
         func.sum(case((Task.status == 'completed', 1), else_=0)).label('completed_count')
-    ).outerjoin(Task, User.id == Task.assigned_to)\
-     .group_by(User.id, User.username).all()
+    ).outerjoin(Task, User.id == Task.assigned_to).group_by(User.id, User.username).all()
     
-    # ============ MEETING REPORTS ============
+    # Meeting Reports
     total_meetings = Meeting.query.count()
     upcoming_meetings = Meeting.query.filter(Meeting.date_time > datetime.utcnow()).count()
     past_meetings = Meeting.query.filter(Meeting.date_time <= datetime.utcnow()).count()
     
-    # Meetings by month (last 6 months)
     meetings_by_month = db.session.query(
         extract('year', Meeting.date_time).label('year'),
         extract('month', Meeting.date_time).label('month'),
         func.count(Meeting.id).label('count')
     ).group_by('year', 'month').order_by('year', 'month').limit(6).all()
     
-    # ============ ACTIVITY SUMMARY ============
-    # Recent activities (last 30 days)
+    # Activity Summary
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     
     recent_budgets = Budget.query.filter(Budget.created_at >= thirty_days_ago).count()
@@ -725,16 +679,13 @@ def reports():
         Task.created_at >= thirty_days_ago
     ).count()
     
-    # Top performing departments (by approved budget amount)
     top_departments = db.session.query(
         Budget.department,
         func.sum(Budget.amount).label('total')
-    ).filter(Budget.status == 'approved')\
-     .group_by(Budget.department)\
-     .order_by(func.sum(Budget.amount).desc()).limit(5).all()
+    ).filter(Budget.status == 'approved').group_by(Budget.department).order_by(func.sum(Budget.amount).desc()).limit(5).all()
     
+    # IMPORTANT: This MUST be the last line
     return render_template('reports.html', 
-                         # Budget stats
                          total_budgets=total_budgets,
                          pending_budgets=pending_budgets,
                          approved_budgets_count=approved_budgets_count,
@@ -742,8 +693,6 @@ def reports():
                          total_approved_amount=total_approved_amount,
                          dept_budgets=dept_budgets,
                          top_departments=top_departments,
-                         
-                         # Task stats
                          total_tasks=total_tasks,
                          completed_tasks=completed_tasks,
                          pending_tasks=pending_tasks,
@@ -753,14 +702,10 @@ def reports():
                          medium_priority_tasks=medium_priority_tasks,
                          low_priority_tasks=low_priority_tasks,
                          tasks_by_user=tasks_by_user,
-                         
-                         # Meeting stats
                          total_meetings=total_meetings,
                          upcoming_meetings=upcoming_meetings,
                          past_meetings=past_meetings,
                          meetings_by_month=meetings_by_month,
-                         
-                         # Activity stats
                          recent_budgets=recent_budgets,
                          recent_meetings=recent_meetings,
                          recent_tasks=recent_tasks,
@@ -771,185 +716,94 @@ def reports():
 @app.route('/reports/export/pdf')
 @login_required
 def export_pdf():
-    """Export reports as PDF"""
     if current_user.role != 'admin':
         flash('Access denied', 'danger')
         return redirect(url_for('dashboard'))
     
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter, landscape
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from io import BytesIO
-    
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
-    styles = getSampleStyleSheet()
-    story = []
-    
-    # Title
-    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30)
-    story.append(Paragraph("KEN Admin - Business Report", title_style))
-    story.append(Paragraph(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
-    story.append(Spacer(1, 20))
-    
-    # Budgets Summary
-    story.append(Paragraph("Budgets Summary", styles['Heading2']))
-    budgets = Budget.query.all()
-    budget_data = [['Department', 'Title', 'Amount', 'Status', 'Date']]
-    for b in budgets:
-        budget_data.append([
-            b.department or 'N/A',
-            b.title[:30],
-            f'${b.amount:,.2f}',
-            b.status,
-            b.created_at.strftime('%Y-%m-%d')
-        ])
-    
-    budget_table = Table(budget_data)
-    budget_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-    ]))
-    story.append(budget_table)
-    story.append(Spacer(1, 20))
-    
-    # Tasks Summary
-    story.append(Paragraph("Tasks Summary", styles['Heading2']))
-    tasks = Task.query.all()
-    task_data = [['Title', 'Priority', 'Status', 'Due Date']]
-    for t in tasks:
-        task_data.append([t.title[:30], t.priority, t.status, t.due_date.strftime('%Y-%m-%d')])
-    
-    task_table = Table(task_data)
-    task_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-    ]))
-    story.append(task_table)
-    
-    doc.build(story)
-    buffer.seek(0)
-    
-    return send_file(
-        buffer, 
-        as_attachment=True, 
-        download_name=f'KEN_Admin_Report_{datetime.now().strftime("%Y%m%d")}.pdf', 
-        mimetype='application/pdf'
-    )
-
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+        styles = getSampleStyleSheet()
+        story = []
+        
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30)
+        story.append(Paragraph("KEN Admin - Business Report", title_style))
+        story.append(Paragraph(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
+        story.append(Spacer(1, 20))
+        
+        story.append(Paragraph("Budgets Summary", styles['Heading2']))
+        budgets = Budget.query.all()
+        budget_data = [['Department', 'Title', 'Amount', 'Status', 'Date']]
+        for b in budgets:
+            budget_data.append([b.department or 'N/A', b.title[:30], f'${b.amount:,.2f}', b.status, b.created_at.strftime('%Y-%m-%d')])
+        
+        budget_table = Table(budget_data)
+        budget_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        story.append(budget_table)
+        
+        doc.build(story)
+        buffer.seek(0)
+        
+        return send_file(buffer, as_attachment=True, download_name=f'KEN_Admin_Report_{datetime.now().strftime("%Y%m%d")}.pdf', mimetype='application/pdf')
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('reports'))
 
 @app.route('/reports/export/excel')
 @login_required
 def export_excel():
-    """Export reports as Excel"""
     if current_user.role != 'admin':
         flash('Access denied', 'danger')
         return redirect(url_for('dashboard'))
     
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
-    from io import BytesIO
-    
-    wb = Workbook()
-    
-    # Budgets sheet
-    ws_budgets = wb.active
-    ws_budgets.title = "Budgets"
-    
-    # Headers
-    headers = ['ID', 'Department', 'Title', 'Amount', 'Status', 'Submitted By', 'Created At']
-    for col, header in enumerate(headers, 1):
-        cell = ws_budgets.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="6b46c0", end_color="6b46c0", fill_type="solid")
-        cell.font = Font(color="FFFFFF", bold=True)
-    
-    # Data
-    for row, budget in enumerate(Budget.query.all(), 2):
-        ws_budgets.cell(row=row, column=1, value=budget.id)
-        ws_budgets.cell(row=row, column=2, value=budget.department or 'N/A')
-        ws_budgets.cell(row=row, column=3, value=budget.title)
-        ws_budgets.cell(row=row, column=4, value=budget.amount)
-        ws_budgets.cell(row=row, column=5, value=budget.status)
-        ws_budgets.cell(row=row, column=6, value=budget.submitted_by)
-        ws_budgets.cell(row=row, column=7, value=budget.created_at.strftime('%Y-%m-%d %H:%M'))
-    
-    # Adjust column widths
-    for column in ws_budgets.columns:
-        max_length = 0
-        column_letter = column[0].column_letter
-        for cell in column:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = min(max_length + 2, 30)
-        ws_budgets.column_dimensions[column_letter].width = adjusted_width
-    
-    # Tasks sheet
-    ws_tasks = wb.create_sheet("Tasks")
-    task_headers = ['ID', 'Title', 'Priority', 'Status', 'Assigned To', 'Due Date']
-    for col, header in enumerate(task_headers, 1):
-        cell = ws_tasks.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="6b46c0", end_color="6b46c0", fill_type="solid")
-        cell.font = Font(color="FFFFFF", bold=True)
-    
-    for row, task in enumerate(Task.query.all(), 2):
-        ws_tasks.cell(row=row, column=1, value=task.id)
-        ws_tasks.cell(row=row, column=2, value=task.title)
-        ws_tasks.cell(row=row, column=3, value=task.priority)
-        ws_tasks.cell(row=row, column=4, value=task.status)
-        ws_tasks.cell(row=row, column=5, value=task.assigned_to)
-        ws_tasks.cell(row=row, column=6, value=task.due_date.strftime('%Y-%m-%d'))
-    
-    # Meetings sheet
-    ws_meetings = wb.create_sheet("Meetings")
-    meeting_headers = ['ID', 'Title', 'Date & Time', 'Duration', 'Meeting Link', 'Location']
-    for col, header in enumerate(meeting_headers, 1):
-        cell = ws_meetings.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="6b46c0", end_color="6b46c0", fill_type="solid")
-        cell.font = Font(color="FFFFFF", bold=True)
-    
-    for row, meeting in enumerate(Meeting.query.all(), 2):
-        ws_meetings.cell(row=row, column=1, value=meeting.id)
-        ws_meetings.cell(row=row, column=2, value=meeting.title)
-        ws_meetings.cell(row=row, column=3, value=meeting.date_time.strftime('%Y-%m-%d %H:%M'))
-        ws_meetings.cell(row=row, column=4, value=meeting.duration)
-        ws_meetings.cell(row=row, column=5, value=meeting.meeting_link or 'N/A')
-        ws_meetings.cell(row=row, column=6, value=meeting.location or 'N/A')
-    
-    # Save to buffer
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    
-    return send_file(
-        buffer, 
-        as_attachment=True, 
-        download_name=f'KEN_Admin_Report_{datetime.now().strftime("%Y%m%d")}.xlsx',
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        
+        wb = Workbook()
+        
+        # Budgets sheet
+        ws_budgets = wb.active
+        ws_budgets.title = "Budgets"
+        headers = ['ID', 'Department', 'Title', 'Amount', 'Status', 'Submitted By', 'Created At']
+        for col, header in enumerate(headers, 1):
+            cell = ws_budgets.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="6b46c0", end_color="6b46c0", fill_type="solid")
+        
+        for row, budget in enumerate(Budget.query.all(), 2):
+            ws_budgets.cell(row=row, column=1, value=budget.id)
+            ws_budgets.cell(row=row, column=2, value=budget.department or 'N/A')
+            ws_budgets.cell(row=row, column=3, value=budget.title)
+            ws_budgets.cell(row=row, column=4, value=budget.amount)
+            ws_budgets.cell(row=row, column=5, value=budget.status)
+            ws_budgets.cell(row=row, column=6, value=budget.submitted_by)
+            ws_budgets.cell(row=row, column=7, value=budget.created_at.strftime('%Y-%m-%d %H:%M'))
+        
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        return send_file(buffer, as_attachment=True, download_name=f'KEN_Admin_Report_{datetime.now().strftime("%Y%m%d")}.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    except Exception as e:
+        flash(f'Error generating Excel: {str(e)}', 'danger')
+        return redirect(url_for('reports'))
 
 # ============ USER MANAGEMENT ROUTES ============
 
 @app.route('/users')
 @login_required
 def view_users():
-    """View all users (admin only)"""
     if current_user.role != 'admin':
         flash('Access denied. Only admins can view users.', 'danger')
         return redirect(url_for('dashboard'))
@@ -959,54 +813,36 @@ def view_users():
 @app.route('/user/create', methods=['POST'])
 @login_required
 def create_user():
-    """Create a new user (admin only)"""
     if current_user.role != 'admin':
         flash('Access denied. Only admins can create users.', 'danger')
         return redirect(url_for('dashboard'))
     
-    # Get form data
     username = request.form.get('username', '').strip()
     email = request.form.get('email', '').strip()
     password = request.form.get('password', '')
     role = request.form.get('role', 'staff')
     
-    # Validation
     if not username or not email or not password:
         flash('All fields are required.', 'danger')
         return redirect(url_for('view_users'))
     
-    # Check if username already exists
-    existing_user = User.query.filter_by(username=username).first()
-    if existing_user:
-        flash(f'Username "{username}" already exists. Please choose a different username.', 'danger')
+    if User.query.filter_by(username=username).first():
+        flash(f'Username "{username}" already exists.', 'danger')
         return redirect(url_for('view_users'))
     
-    # Check if email already exists
-    existing_email = User.query.filter_by(email=email).first()
-    if existing_email:
-        flash(f'Email "{email}" already exists. Please use a different email.', 'danger')
+    if User.query.filter_by(email=email).first():
+        flash(f'Email "{email}" already exists.', 'danger')
         return redirect(url_for('view_users'))
     
-    # Password length validation
     if len(password) < 4:
         flash('Password must be at least 4 characters long.', 'danger')
         return redirect(url_for('view_users'))
     
-    # Create new user
     try:
-        user = User(
-            username=username,
-            email=email,
-            password=generate_password_hash(password),
-            role=role,
-            reminder_preference='email'
-        )
-        
+        user = User(username=username, email=email, password=generate_password_hash(password), role=role, reminder_preference='email')
         db.session.add(user)
         db.session.commit()
-        
-        flash(f'User "{user.username}" has been created successfully!', 'success')
-        
+        flash(f'User "{user.username}" created!', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error creating user: {str(e)}', 'danger')
@@ -1016,48 +852,30 @@ def create_user():
 @app.route('/user/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_user(id):
-    """Delete a user (admin only)"""
     if current_user.role != 'admin':
-        flash('Access denied. Only admins can delete users.', 'danger')
+        flash('Access denied.', 'danger')
         return redirect(url_for('view_users'))
     
     user_to_delete = User.query.get_or_404(id)
     
-    # Prevent admin from deleting themselves
     if user_to_delete.id == current_user.id:
         flash('You cannot delete your own account.', 'danger')
         return redirect(url_for('view_users'))
     
-    # Prevent deleting the default admin account
     if user_to_delete.username == 'admin':
         flash('Cannot delete the default admin account.', 'danger')
         return redirect(url_for('view_users'))
     
     try:
         username = user_to_delete.username
-        
-        # Handle related records before deletion
-        # 1. Update budgets submitted by this user
         Budget.query.filter_by(submitted_by=user_to_delete.id).update({'submitted_by': None})
-        
-        # 2. Update meetings created by this user
         Meeting.query.filter_by(created_by=user_to_delete.id).update({'created_by': None})
-        
-        # 3. Update tasks assigned to this user
         Task.query.filter_by(assigned_to=user_to_delete.id).update({'assigned_to': None})
-        
-        # 4. Delete meeting attendance records
         MeetingAttendance.query.filter_by(user_id=user_to_delete.id).delete()
-        
-        # 5. Delete calendar events
         CalendarEvent.query.filter_by(user_id=user_to_delete.id).delete()
-        
-        # Finally delete the user
         db.session.delete(user_to_delete)
         db.session.commit()
-        
-        flash(f'User "{username}" has been deleted successfully.', 'success')
-        
+        flash(f'User "{username}" deleted.', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error deleting user: {str(e)}', 'danger')
@@ -1068,11 +886,9 @@ def delete_user(id):
 with app.app_context():
     db.create_all()
     if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', email='admin@business.com', 
-                    password=generate_password_hash('admin123'), role='admin', reminder_preference='email')
+        admin = User(username='admin', email='admin@business.com', password=generate_password_hash('admin123'), role='admin', reminder_preference='email')
         db.session.add(admin)
-        staff = User(username='staff', email='staff@business.com', 
-                    password=generate_password_hash('staff123'), role='staff', reminder_preference='email')
+        staff = User(username='staff', email='staff@business.com', password=generate_password_hash('staff123'), role='staff', reminder_preference='email')
         db.session.add(staff)
         db.session.commit()
         print("✅ KEN Admin initialized with default users")
