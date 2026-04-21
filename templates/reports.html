@@ -125,13 +125,13 @@
                 <i class="bi bi-exclamation-triangle"></i> Tasks by Priority
             </div>
             <div class="card-body">
+                {% set total = total_tasks|default(1) %}
                 <div class="mb-3">
                     <div class="d-flex justify-content-between">
                         <span>High Priority</span>
                         <span class="text-danger">{{ high_priority_tasks|default(0) }}</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        {% set total = total_tasks|default(1) %}
                         <div class="progress-bar bg-danger" style="width: {{ (high_priority_tasks|default(0) / total * 100) }}%"></div>
                     </div>
                 </div>
