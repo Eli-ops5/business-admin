@@ -552,7 +552,6 @@ def reports():
     rejected_budgets_count = Budget.query.filter_by(status='rejected').count()
     
     # Department-wise budget summary
-    from sqlalchemy import func
     dept_budgets = db.session.query(
         Budget.department,
         func.count(Budget.id).label('count'),
@@ -593,7 +592,6 @@ def reports():
     past_meetings = Meeting.query.filter(Meeting.date_time <= datetime.utcnow()).count()
     
     # Meetings by month (last 6 months)
-    from sqlalchemy import extract
     meetings_by_month = db.session.query(
         extract('year', Meeting.date_time).label('year'),
         extract('month', Meeting.date_time).label('month'),
@@ -652,47 +650,6 @@ def reports():
                          recent_meetings=recent_meetings,
                          recent_tasks=recent_tasks,
                          completed_recent_tasks=completed_recent_tasks)
-
-# Helper function for SQL CASE statement
-def case(whens, else_=None):
-    from sqlalchemy.sql import case as sql_case
-    return sql_case(whens, else_=else_)
-
-@app.route('/meeting/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_meeting(id):
-    """Delete a meeting (creator or admin only)"""
-    meeting = Meeting.query.get_or_404(id)
-    
-    # Check permission: only creator or admin can delete
-    if meeting.created_by != current_user.id and current_user.role != 'admin':
-        flash('You do not have permission to delete this meeting.', 'danger')
-        return redirect(url_for('view_meetings'))
-    
-    try:
-        meeting_title = meeting.title
-        
-        # Delete related records first
-        # 1. Delete meeting attendance records
-        MeetingAttendance.query.filter_by(meeting_id=meeting.id).delete()
-        
-        # 2. Delete calendar events for this meeting
-        CalendarEvent.query.filter_by(meeting_id=meeting.id).delete()
-        
-        # 3. Update tasks that reference this meeting
-        Task.query.filter_by(meeting_id=meeting.id).update({'meeting_id': None})
-        
-        # Finally delete the meeting
-        db.session.delete(meeting)
-        db.session.commit()
-        
-        flash(f'Meeting "{meeting_title}" has been deleted successfully.', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error deleting meeting: {str(e)}', 'danger')
-    
-    return redirect(url_for('view_meetings'))
 
 # ============ USER MANAGEMENT ROUTES ============
 
