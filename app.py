@@ -260,6 +260,7 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
+
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
@@ -577,21 +578,44 @@ def view_tasks():
 @login_required
 def create_task():
     if request.method == 'POST':
+        assigned_to_id = int(request.form['assigned_to'])
+        assigned_user = User.query.get(assigned_to_id)
+        
+        print(f"📝 Creating task for user: {assigned_user.username if assigned_user else 'Unknown'}")
+        print(f"📧 User reminder preference: {assigned_user.reminder_preference if assigned_user else 'None'}")
+        
         task = Task(
             title=request.form['title'],
             description=request.form.get('description', ''),
-            assigned_to=int(request.form['assigned_to']),
+            assigned_to=assigned_to_id,
             assigned_by=current_user.id,
             due_date=datetime.strptime(request.form['due_date'], '%Y-%m-%d'),
             priority=request.form.get('priority', 'medium')
         )
         db.session.add(task)
         db.session.commit()
-        flash('Task assigned successfully!', 'success')
+        
+        print(f"✅ Task created with ID: {task.id}")
+        
+        # Send email notification to assigned user
+        if assigned_user and assigned_user.reminder_preference == 'email':
+            print("📧 Attempting to send email...")
+            email_sent = send_task_assignment_notification(task, assigned_user, current_user)
+            if email_sent:
+                print("✅ Email sent successfully!")
+                flash(f'Task assigned successfully! Email notification sent to {assigned_user.username}.', 'success')
+            else:
+                print("❌ Email failed to send!")
+                flash(f'Task assigned successfully! (Email failed to send - check email configuration)', 'warning')
+        else:
+            print(f"⚠️ No email sent - reminder_preference = {assigned_user.reminder_preference if assigned_user else 'None'}")
+            flash(f'Task assigned successfully! (No notification sent - user has reminders disabled)', 'info')
+        
         return redirect(url_for('view_tasks'))
+    
     users = User.query.filter(User.id != current_user.id).all()
-    return render_template('create_task.html', users=users)
-
+    meetings = Meeting.query.all()
+    return render_template('create_task.html', users=users, meetings=meetings)
 @app.route('/task/<int:id>/update', methods=['POST'])
 @login_required
 def update_task(id):
@@ -635,6 +659,21 @@ def reports():
     if current_user.role != 'admin':
         flash('Access denied', 'danger')
         return redirect(url_for('dashboard'))
+
+@app.route('/test-email')
+@login_required
+def test_email():
+    """Test if email is working"""
+    try:
+        msg = Message(
+            'Test Email from KEN Admin',
+            recipients=[current_user.email]
+        )
+        msg.body = f"Hello {current_user.username},\n\nThis is a test email. Your email configuration is working!\n\nBest regards,\nKEN Admin Team"
+        mail.send(msg)
+        return "✅ Test email sent! Check your inbox."
+    except Exception as e:
+        return f"❌ Failed: {str(e)}"
     
     # ============ BUDGET REPORTS ============
     total_budgets = Budget.query.count()
