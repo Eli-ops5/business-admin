@@ -1,57 +1,59 @@
-@app.route('/task/create', methods=['GET', 'POST'])
-@login_required
-def create_task():
-    if request.method == 'POST':
-        assigned_to_id = int(request.form['assigned_to'])
-        assigned_user = User.query.get(assigned_to_id)
-        
-        task = Task(
-            title=request.form['title'],
-            description=request.form.get('description', ''),
-            assigned_to=assigned_to_id,
-            assigned_by=current_user.id,
-            due_date=datetime.strptime(request.form['due_date'], '%Y-%m-%d'),
-            priority=request.form.get('priority', 'medium')
-        )
-        db.session.add(task)
-        db.session.commit()
-        
-        # Send email notification to assigned user
-        if assigned_user and assigned_user.reminder_preference == 'email':
-            send_task_assignment_notification(task, assigned_user, current_user)
-            flash(f'Task assigned successfully! Notification sent to {assigned_user.username}.', 'success')
-        else:
-            flash(f'Task assigned successfully! (No notification sent - user has reminders disabled)', 'success')
-        
-        return redirect(url_for('view_tasks'))
-    
-    users = User.query.filter(User.id != current_user.id).all()
-    meetings = Meeting.query.all()
-    return render_template('create_task.html', users=users, meetings=meetings)
+{% extends "base.html" %}
 
-# Task status update notification
-def send_task_update_notification(task, user, old_status, new_status):
-    try:
-        msg = Message(
-            f'Task Updated: {task.title} - KEN Admin',
-            recipients=[user.email]
-        )
-        msg.body = f"""
-Hello {user.username},
+{% block page_title %}Assign Task{% endblock %}
 
-The status of your task has been updated.
-
-Task: {task.title}
-Old Status: {old_status}
-New Status: {new_status}
-
-View your tasks at: https://business-admin-1hpp.onrender.com/tasks
-
-Best regards,
-KEN Admin Team
-"""
-        mail.send(msg)
-        return True
-    except Exception as e:
-        print(f"Failed to send update notification: {e}")
-        return False
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Assign New Task</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Task Title *</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="assigned_to" class="form-label">Assign To *</label>
+                        <select class="form-control" id="assigned_to" name="assigned_to" required>
+                            <option value="">Select user...</option>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.username }} ({{ user.role }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="due_date" class="form-label">Due Date *</label>
+                        <input type="date" class="form-control" id="due_date" name="due_date" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">Priority</label>
+                        <select class="form-control" id="priority" name="priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('view_tasks') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Assign Task
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
