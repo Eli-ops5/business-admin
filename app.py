@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import uuid
 from werkzeug.utils import secure_filename
 from io import BytesIO
-from sqlalchemy import func, extract, cases
+from sqlalchemy import func, extract, case
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-this')
